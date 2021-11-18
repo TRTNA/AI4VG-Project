@@ -5,8 +5,8 @@ public class CameraControl : MonoBehaviour
 {
     public GameObject target;//the target object
     public float rotationSpeed = 20.0f;
-    public float zoomMod = 10.0f;
-    private float speedSpeed = 10.0f;//a speed modifier
+    public float zoomMultiplier = 10.0f;
+    private float speedMod = 10.0f;//a speed modifier
     private Vector3 point;//the coord to the point where the camera looks at
     private float horizontalInput;
     private float scrollDelta;
@@ -22,7 +22,7 @@ public class CameraControl : MonoBehaviour
         horizontalInput = Input.GetAxis("Horizontal");
         scrollDelta = Input.mouseScrollDelta.y;
         transform.RotateAround(point, Vector3.up, -horizontalInput * rotationSpeed * Time.deltaTime * speedMod);
-        transform.Translate(Vector3.forward * scrollDelta * zoomSpeed * Time.deltaTime);
+        transform.Translate(Vector3.forward * scrollDelta * zoomMultiplier * Time.deltaTime);
     }
 
 
