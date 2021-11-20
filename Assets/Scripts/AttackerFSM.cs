@@ -12,6 +12,9 @@ public class AttackerFSM : MonoBehaviour
     [Range(1, 10)]
     public int reactionTime;
 
+    public float walkSpeed = 3.0f;
+    public float runSpeed = 7.0f;
+
     public float interactionRay = 2.0f; //cambiare nome
     private FSM fsm;
     private Transform nearestGate;
@@ -30,7 +33,7 @@ public class AttackerFSM : MonoBehaviour
 
         FSMState approaching = new FSMState();
         approaching.enterActions.Add(FindNearestGate);
-        approaching.stayActions.Add(GoToDestination);
+        approaching.stayActions.Add(WalkToDestination);
 
         FSMState breaching = new FSMState();
         breaching.enterActions.Add(Breach);
@@ -122,16 +125,18 @@ public class AttackerFSM : MonoBehaviour
         if(target != null && ! gameObject.GetComponent<NavMeshAgent>().hasPath)
         {
             anim.Play("Run");
+            GetComponent<NavMeshAgent>().speed = runSpeed;
             gameObject.GetComponent<NavMeshAgent>().destination = target.transform.position;
         }
     }
 
 
-    private void GoToDestination()
+    private void WalkToDestination()
     {
         if (! gameObject.GetComponent<NavMeshAgent>().hasPath)
         {
             anim.Play("Walk");
+            GetComponent<NavMeshAgent>().speed = walkSpeed;
             gameObject.GetComponent<NavMeshAgent>().destination = nearestGate.position;
         }
     }
