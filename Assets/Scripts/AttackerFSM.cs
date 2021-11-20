@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
+[RequireComponent(typeof(Animator))]
 public class AttackerFSM : MonoBehaviour
 {
     public Transform[] fortsGates = new Transform[4];
@@ -16,9 +17,12 @@ public class AttackerFSM : MonoBehaviour
     private Transform nearestGate;
     private GameObject target;
 
+    private Animation anim;
+
     // Start is called before the first frame update
     void Start()
     {
+        anim = GetComponent<Animation>();
         for (int i = 0; i < 4; i++)
         {
             fortsGates[i] = GameObject.Find("Fort/Gate" + i).transform;
@@ -95,6 +99,7 @@ public class AttackerFSM : MonoBehaviour
     private void Search()
     {
         //albero di decisione per scegliere un target e firare transizione?
+        anim.Play("Idle");
         Debug.Log(gameObject.name + " is searching...");
     }
 
@@ -108,6 +113,7 @@ public class AttackerFSM : MonoBehaviour
     private void Attack()
     {
         //implementare attacco a target
+        anim.Play("Attack1");
         Debug.Log(gameObject.name + " is attacking!");
     }
 
@@ -115,6 +121,7 @@ public class AttackerFSM : MonoBehaviour
     {
         if(target != null && ! gameObject.GetComponent<NavMeshAgent>().hasPath)
         {
+            anim.Play("Run");
             gameObject.GetComponent<NavMeshAgent>().destination = target.transform.position;
         }
     }
@@ -124,6 +131,7 @@ public class AttackerFSM : MonoBehaviour
     {
         if (! gameObject.GetComponent<NavMeshAgent>().hasPath)
         {
+            anim.Play("Walk");
             gameObject.GetComponent<NavMeshAgent>().destination = nearestGate.position;
         }
     }
