@@ -2005,9 +2005,10 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  reactionTime: 0
+  reactionTime: 1
   walkSpeed: 3
   runSpeed: 7
+  attackCooldown: 2
   interactionRay: 4
 --- !u!1 &3156135342966150935
 GameObject:
