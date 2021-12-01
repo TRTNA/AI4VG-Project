@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class HealthController : MonoBehaviour, ITarget, ISubject
+public class HealthController : Target, ISubject
 {
     public List<IObserver> observers = new List<IObserver>(); 
     public float _health = 100f;
@@ -27,13 +27,13 @@ public class HealthController : MonoBehaviour, ITarget, ISubject
     }
 
 
-    public float GetHealth()
+    public override float GetHealth()
     {
         return Health;
     }
 
 
-    public void TakeDamage(float damage)
+    public override void TakeDamage(float damage)
     {
         Debug.Log(gameObject.name + " suffered " + damage + " damages");
         Health -= damage;
