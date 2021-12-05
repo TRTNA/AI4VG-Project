@@ -43,7 +43,7 @@ public class HealthController : Target, ISubject
     {
         foreach (IObserver observer in observers)
         {
-            observer.OnNotify(this, 0);
+            observer.OnNotify(gameObject, 0);
         }
     }
 

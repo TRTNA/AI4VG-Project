@@ -7,14 +7,15 @@ public class Gate : MonoBehaviour, IObserver
 {
     private bool isOpen = false;
 
-    public void OnNotify(ISubject subject, object status)
+    public void OnNotify(GameObject subject, object status)
     {
-        if (typeof(HealthController) == subject.GetType())
+        if (status.GetType() == typeof(int) && (int)status == 0)
         {
             Debug.Log("notifying to " + gameObject.name + " that health is 0");
             isOpen = true;
             //temporary
             gameObject.GetComponent<MeshRenderer>().enabled = false;
+            gameObject.GetComponent<BoxCollider>().enabled = false;
         }
     }
 

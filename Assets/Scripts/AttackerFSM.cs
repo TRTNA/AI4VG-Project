@@ -1,13 +1,13 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
+//TODO da rimuovere ref a linq e fare in altro modo il minimo
 using System.Linq;
 using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-public class AttackerFSM : MonoBehaviour
+public class AttackerFSM : MonoBehaviour, IObserver
 {
     public GameObject[] fortsGates = new GameObject[4];
     [Range(1, 10)]
@@ -19,111 +19,205 @@ public class AttackerFSM : MonoBehaviour
 
     public float interactionRay = 2.0f; //cambiare nome
     private FSM fsm;
-    private Transform nearestGate;
-    private GameObject target;
+    public Transform nearestGate;
+    public GameObject target;
 
     private bool attackingCoroutineRunning = false;
 
     private Animation anim;
+    public Vector3 destination;
+    public GameObject hordeReference;
+    private DecisionTree breachingDT;
+    private Vector3 finalPosition;
+    public float forwardOffset = 3f;
+    public float circleRay = 5f;
+
 
     // Start is called before the first frame update
     void Start()
     {
         anim = GetComponent<Animation>();
         anim.playAutomatically = false;
-        for (int i = 0; i < 4; i++)
-        {
-            fortsGates[i] = GameObject.Find("Fort/Gate" + i);
-        }
+        fortsGates = GameObject.FindGameObjectsWithTag("Gate");
 
-        FSMState approaching = new FSMState();
-        approaching.enterActions.Add(FindNearestGate);
-        approaching.stayActions.Add(WalkToDestination);
 
         FSMState breaching = new FSMState();
-        breaching.enterActions.Add(Breach);
-        breaching.stayActions.Add(Attack);
+        breaching.enterActions.Add(FindNearestGate);
+        breaching.enterActions.Add(SetNearestGateAsDestination);
 
-        FSMState searching = new FSMState();
-        searching.enterActions.Add(FreeTarget);
-        searching.stayActions.Add(Search);
-
-        FSMTransition approachingToBreachingTransition = new FSMTransition(NearestGateIsCloseToCharacterAndCanBeBreached);
-        approaching.AddTransition(approachingToBreachingTransition, breaching);
-
-        FSMTransition breachingToSearchingTransition = new FSMTransition(NearestGateIsBreachedAndIsCloseToCharacter);
-        breaching.AddTransition(breachingToSearchingTransition, searching);
-
-        FSMTransition approachingToSearchingTransition = new FSMTransition(NearestGateIsBreachedAndIsCloseToCharacter);
-        approaching.AddTransition(approachingToSearchingTransition, searching);
+        FSMState wandering = new FSMState();
+        wandering.stayActions.Add(Wander);
+        wandering.stayActions.Add(LookForAnEnemy);
 
         FSMState attacking = new FSMState();
-        attacking.stayActions.Add(Attack);
+        attacking.enterActions.Add(() => destination = target.transform.position);
+        attacking.stayActions.Add(RunToDestination);
 
-        FSMState chasing = new FSMState();
-        chasing.stayActions.Add(Chase);
+        FSMTransition wanderingToAttacking = new FSMTransition(TargetAcquired);
+        wandering.AddTransition(wanderingToAttacking, attacking);
 
-        FSMTransition searchingToAttackingTransition = new FSMTransition(TargetIsClose);
-        searching.AddTransition(searchingToAttackingTransition, attacking);
+        FSMTransition tran = new FSMTransition(NearestGateIsWithingInteractionRateAndBreached);
+        breaching.AddTransition(tran, wandering);
 
-        FSMTransition searchingToChasingTransition = new FSMTransition(TargetIsFar);
-        searching.AddTransition(searchingToChasingTransition, chasing);
+        //breaching dt def
+        DTDecision isGateWithinInteractionRange = new DTDecision(IsGateWithinInteractionRange);
 
-        FSMTransition chasingToAttackingTransition = new FSMTransition(TargetIsClose);
-        chasing.AddTransition(chasingToAttackingTransition, attacking);
+        DTAction walkingToGateAction = new DTAction(WalkToDestination);
 
-        FSMTransition attackingToChaseTransition = new FSMTransition(TargetIsFar);
-        attacking.AddTransition(attackingToChaseTransition, chasing);
+        DTDecision isGateBreached = new DTDecision(IsGateBreached);
 
-        FSMTransition attackingToSearchingTransition = new FSMTransition(TargetIsUnavailable);
-        attacking.AddTransition(attackingToSearchingTransition, searching);
-        
+        DTAction attackingGateAction = new DTAction(AttackGate);
+        DTAction goIntoFort = new DTAction(ReachFortsCenter);
 
-        fsm = new FSM(approaching);
+        isGateBreached.AddLink(true, goIntoFort);
+        isGateBreached.AddLink(false, attackingGateAction);
+
+        isGateWithinInteractionRange.AddLink(false, walkingToGateAction);
+        isGateWithinInteractionRange.AddLink(true, isGateBreached);
+
+        breachingDT = new DecisionTree(isGateWithinInteractionRange);
+        //end breaching dt def
+
+        breaching.stayActions.Add(WalkBreachingDT);
+
+        fsm = new FSM(breaching);
         StartCoroutine(UpdateFSM());
     }
 
-    private bool TargetIsUnavailable()
+    private bool TargetAcquired()
     {
-        return target == null;
+        return target != null;
     }
 
-    // Update is called once per frame
-    void Update()
+
+    private void WalkBreachingDT()
     {
-        
+        if (breachingDT != null)
+        {
+            breachingDT.walk();
+        }
     }
 
-    private bool TargetIsClose()
+    private void RunToDestination()
     {
-        return target != null && Vector3.Distance(target.transform.position, gameObject.transform.position) < interactionRay;
+        GetComponent<NavMeshAgent>().speed = runSpeed;
+        anim.Play("Run");
+        GetComponent<NavMeshAgent>().SetDestination(destination);
     }
 
-    private bool TargetIsFar()
+    private bool NearestGateIsWithingInteractionRateAndBreached()
     {
-        return target != null && Vector3.Distance(target.transform.position, gameObject.transform.position) > interactionRay;
+        return (bool)IsGateBreached(null) && (bool)IsGateWithinInteractionRange(null);
     }
 
-    private bool NearestGateIsCloseToCharacterAndCanBeBreached()
+    private object ReachFortsCenter(object bundle)
     {
-        return ! nearestGate.gameObject.GetComponent<Gate>().IsOpen() && Vector3.Distance(gameObject.transform.position, nearestGate.position) < interactionRay;
+        GameObject fort = GameObject.Find("Fort/Yard");
+        Vector3 randomPoint = UnityEngine.Random.insideUnitCircle * 5f;
+        destination = fort.transform.position + randomPoint;
+        return WalkToDestination(null);
     }
 
-    private bool NearestGateIsBreachedAndIsCloseToCharacter()
+    private void LookForAnEnemy()
     {
-        return nearestGate.gameObject.GetComponent<Gate>().IsOpen() && Vector3.Distance(gameObject.transform.position, nearestGate.position) < interactionRay;
+        Vector3 transformPos = transform.position;
+        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Defender");
+        Shuffle(ref enemies);
+        foreach (GameObject enemy in enemies)
+        {
+            RaycastHit hit;
+            bool result = Physics.Linecast(transformPos, enemy.transform.position, out hit);
+            if (result && hit.collider.gameObject.CompareTag("Defender"))
+            {
+                target = hit.collider.gameObject;
+            }
+        }
     }
 
-    private void Search()
+    private void Shuffle<T>(ref T[] objs)
     {
-        //albero di decisione per scegliere un target e firare transizione?
-        anim.Play("Idle");
-        Debug.Log(gameObject.name + " is searching...");
+        for (int i = 0; i < objs.Length; i++)
+        {
+            int rand = UnityEngine.Random.Range(0, objs.Length);
+            T temp = objs[i];
+            objs[i] = objs[rand];
+            objs[rand] = temp;
+        }
     }
 
-    private void Breach()
+    private void Wander()
     {
-        Debug.Log(gameObject.name + " is breaching a gate!");
+        Vector3 targetCircleCenter = transform.position + Vector3.forward * forwardOffset;
+        Vector2 randomPoint = UnityEngine.Random.insideUnitCircle * circleRay;
+        Vector3 randomPointAroundCircle = new Vector3(randomPoint.x + targetCircleCenter.x, targetCircleCenter.y, randomPoint.y + targetCircleCenter.z);
+        anim.Play("Walk");
+        NavMeshHit hit;
+        bool targetNotOnYardArea = NavMesh.Raycast(transform.position, randomPointAroundCircle, out hit, 8);
+        bool targetOnYardArea = !targetNotOnYardArea;
+        bool characterOnYardArea = NavMesh.SamplePosition(transform.position, out hit, 0.1f, 8);
+        if (characterOnYardArea && ! targetOnYardArea)
+        {
+            var yard = GameObject.Find("Fort/Yard");
+            Vector3 randomPos = UnityEngine.Random.insideUnitSphere * forwardOffset + yard.transform.position;
+            NavMesh.SamplePosition(randomPos, out hit, forwardOffset, 8);
+            randomPointAroundCircle = hit.position;
+        }
+        Debug.DrawLine(transform.position, randomPointAroundCircle, Color.green, 1f);
+        GetComponent<NavMeshAgent>().speed = walkSpeed / 2;
+        GetComponent<NavMeshAgent>().autoBraking = false;
+        GetComponent<NavMeshAgent>().SetDestination(randomPointAroundCircle);
+
+    }
+
+
+
+    private object AttackGate(object bundle)
+    {
+        if (nearestGate != null)
+        {
+            target = nearestGate.gameObject;
+            Attack();
+            return true;
+        }
+        return false;
+    }
+
+
+
+    /*private void FindAnAlly()
+    {
+        GameObject[] allies = GameObject.FindGameObjectsWithTag("Attacker");
+        if (allies.Length == 0) return;
+        RaycastHit hit;
+        allies = allies.Where(ally => Physics.Raycast(transform.position, ally.transform.position, out hit, 1000)).ToArray();
+        hordeReference = allies.OrderBy(ally => Vector3.Distance(gameObject.transform.position, ally.transform.position)).ElementAt(0);
+    }*/
+
+    private object IsGateWithinInteractionRange(object bundle)
+    {
+        return Vector3.Distance(gameObject.transform.position, nearestGate.position) < interactionRay;
+    }
+
+    private object IsGateBreached(object bundle)
+    {
+        return nearestGate.gameObject.GetComponent<Gate>().IsOpen();
+    }
+
+    private void SetNearestGateAsDestination()
+    {
+        destination = nearestGate.position;
+    }
+
+    private object WalkToDestination(object bundle)
+    {
+        if (destination != null)
+        {
+            anim.Play("Walk");
+            GetComponent<NavMeshAgent>().speed = walkSpeed;
+            GetComponent<NavMeshAgent>().SetDestination(destination);
+            return true;
+        }
+        return false;
     }
 
     private void Attack()
@@ -136,36 +230,11 @@ public class AttackerFSM : MonoBehaviour
         }
     }
 
-    private void Chase()
-    {
-        if(target != null && ! gameObject.GetComponent<NavMeshAgent>().hasPath)
-        {
-            anim.Play("Run");
-            GetComponent<NavMeshAgent>().speed = runSpeed;
-            gameObject.GetComponent<NavMeshAgent>().destination = target.transform.position;
-        }
-    }
-
-    private void FreeTarget()
-    {
-        target = null;
-    }
-
-
-    private void WalkToDestination()
-    {
-        if (! gameObject.GetComponent<NavMeshAgent>().hasPath)
-        {
-            anim.Play("Walk");
-            GetComponent<NavMeshAgent>().speed = walkSpeed;
-            gameObject.GetComponent<NavMeshAgent>().destination = nearestGate.position;
-        }
-    }
 
     private void FindNearestGate()
     {
         nearestGate = GetNearestGatePosition();
-        target = nearestGate.gameObject;
+        SetNearestGateAsDestination();
     }
 
     private Transform GetNearestGatePosition()
@@ -191,22 +260,26 @@ public class AttackerFSM : MonoBehaviour
 
     IEnumerator AttackTarget()
     {
-        while(true && target != null)
+        GameObject targetMemo = target;
+        target.GetComponent<HealthController>().AddObserver(this);
+        while (target != null)
         {
-            if (target != null && target.gameObject.GetComponent<HealthController>().GetHealth() == 0)
-            {
-                target = null;
-                attackingCoroutineRunning = false;
-                anim.Play("Idle");
-                yield break;
-            }
             anim.Play("Attack1");
             Debug.Log(gameObject.name + " is attacking!");
             target.SendMessage("TakeDamage", 10);
             yield return new WaitForSeconds(attackCooldown);
 
         }
+        targetMemo.GetComponent<HealthController>().RemoveObserver(this);
         anim.Play("Idle");
         attackingCoroutineRunning = false;
+    }
+
+    public void OnNotify(GameObject subject, object status)
+    {
+        if (subject.CompareTag("Gate") && (int)status == 0)
+        {
+            target = null;
+        }
     }
 }

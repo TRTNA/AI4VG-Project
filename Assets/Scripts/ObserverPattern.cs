@@ -4,7 +4,7 @@ using UnityEngine;
 
 public interface IObserver
 {
-    void OnNotify(ISubject subject, object status);
+    void OnNotify(GameObject subject, object status);
 }
 
 public interface ISubject
