@@ -7,6 +7,7 @@ using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
+[RequireComponent(typeof(ConstrainedWanderBehaviour)), RequireComponent(typeof(AttackingBehaviour))]
 public class AttackerFSM : MonoBehaviour, IObserver
 {
     public GameObject[] fortsGates = new GameObject[4];
@@ -32,10 +33,15 @@ public class AttackerFSM : MonoBehaviour, IObserver
     public float forwardOffset = 3f;
     public float circleRay = 5f;
 
+    ConstrainedWanderBehaviour wanderBehaviour;
+    AttackingBehaviour attackingBehaviour;
+
 
     // Start is called before the first frame update
     void Start()
     {
+        wanderBehaviour = GetComponent<ConstrainedWanderBehaviour>();
+        attackingBehaviour = GetComponent<AttackingBehaviour>();
         anim = GetComponent<Animation>();
         anim.playAutomatically = false;
         fortsGates = GameObject.FindGameObjectsWithTag("Gate");
@@ -46,12 +52,26 @@ public class AttackerFSM : MonoBehaviour, IObserver
         breaching.enterActions.Add(SetNearestGateAsDestination);
 
         FSMState wandering = new FSMState();
+        wandering.enterActions.Add(() => Debug.Log("Entering wandering"));
         wandering.stayActions.Add(Wander);
         wandering.stayActions.Add(LookForAnEnemy);
 
         FSMState attacking = new FSMState();
+        attacking.enterActions.Add(() => Debug.Log("Entering attacking"));
+
         attacking.enterActions.Add(() => destination = target.transform.position);
         attacking.stayActions.Add(RunToDestination);
+        attacking.stayActions.Add(() => { 
+            if (! attackingBehaviour.IsAttacking())
+            {
+                attackingBehaviour.AttackTarget(target); anim.Play("Attack1");
+            }
+             
+        });
+        attacking.exitActions.Add(() => target = null);
+
+        FSMTransition attackingToWandering = new FSMTransition(() => ! attackingBehaviour.IsAttacking());
+        attacking.AddTransition(attackingToWandering, wandering);
 
         FSMTransition wanderingToAttacking = new FSMTransition(TargetAcquired);
         wandering.AddTransition(wanderingToAttacking, attacking);
@@ -147,25 +167,10 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
     private void Wander()
     {
-        Vector3 targetCircleCenter = transform.position + Vector3.forward * forwardOffset;
-        Vector2 randomPoint = UnityEngine.Random.insideUnitCircle * circleRay;
-        Vector3 randomPointAroundCircle = new Vector3(randomPoint.x + targetCircleCenter.x, targetCircleCenter.y, randomPoint.y + targetCircleCenter.z);
         anim.Play("Walk");
-        NavMeshHit hit;
-        bool targetNotOnYardArea = NavMesh.Raycast(transform.position, randomPointAroundCircle, out hit, 8);
-        bool targetOnYardArea = !targetNotOnYardArea;
-        bool characterOnYardArea = NavMesh.SamplePosition(transform.position, out hit, 0.1f, 8);
-        if (characterOnYardArea && ! targetOnYardArea)
-        {
-            var yard = GameObject.Find("Fort/Yard");
-            Vector3 randomPos = UnityEngine.Random.insideUnitSphere * forwardOffset + yard.transform.position;
-            NavMesh.SamplePosition(randomPos, out hit, forwardOffset, 8);
-            randomPointAroundCircle = hit.position;
-        }
-        Debug.DrawLine(transform.position, randomPointAroundCircle, Color.green, 1f);
         GetComponent<NavMeshAgent>().speed = walkSpeed / 2;
         GetComponent<NavMeshAgent>().autoBraking = false;
-        GetComponent<NavMeshAgent>().SetDestination(randomPointAroundCircle);
+        GetComponent<NavMeshAgent>().SetDestination(wanderBehaviour.GetWanderDestination());
 
     }
 
@@ -175,8 +180,8 @@ public class AttackerFSM : MonoBehaviour, IObserver
     {
         if (nearestGate != null)
         {
-            target = nearestGate.gameObject;
-            Attack();
+            attackingBehaviour.AttackTarget(nearestGate.gameObject);
+            anim.Play("Attack1");
             return true;
         }
         return false;

@@ -6,6 +6,8 @@ TagManager:
   tags:
   - Attacker
   - Gate
+  - Defender
+  - Yard
   layers:
   - Default
   - TransparentFX

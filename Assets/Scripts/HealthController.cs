@@ -19,6 +19,7 @@ public class HealthController : Target, ISubject
             {
                 _health = 0;
                 Notify();
+                observers.Clear();
             } else
             {
                 _health = value;
