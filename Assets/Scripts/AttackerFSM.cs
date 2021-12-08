@@ -1,92 +1,115 @@
-using System;
 using System.Collections;
-//TODO da rimuovere ref a linq e fare in altro modo il minimo
-using System.Linq;
 using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-[RequireComponent(typeof(ConstrainedWanderBehaviour)), RequireComponent(typeof(AttackingBehaviour))]
+
 public class AttackerFSM : MonoBehaviour, IObserver
 {
-    public GameObject[] fortsGates = new GameObject[4];
+    #region public variables declarations
+    [Header("FSM settings")]
     [Range(1, 10)]
     public int reactionTime = 1;
 
+    [Header("Generic settings")]
     public float walkSpeed = 3.0f;
     public float runSpeed = 7.0f;
-    public float attackCooldown = 10.0f;
+    public float interactionRange = 5.0f;
 
-    public float interactionRay = 2.0f; //cambiare nome
-    private FSM fsm;
-    public Transform nearestGate;
-    public GameObject target;
+    [Header("Attacking settings")]
+    public float damage = 10f;
 
-    private bool attackingCoroutineRunning = false;
-
-    private Animation anim;
-    public Vector3 destination;
-    public GameObject hordeReference;
-    private DecisionTree breachingDT;
-    private Vector3 finalPosition;
-    public float forwardOffset = 3f;
+    [Header("Wandering settings")]
+    public string constrainedAreaTag;
+    public string navMeshAreaName;
+    public float circleForwardOffset = 5f;
     public float circleRay = 5f;
+    #endregion
 
-    ConstrainedWanderBehaviour wanderBehaviour;
-    AttackingBehaviour attackingBehaviour;
+    #region private variables declarations
+    private FSM fsm;
 
+    private NavMeshAgent agent;
+    private Animation anim;
 
-    // Start is called before the first frame update
+    private GameObject[] fortsGates;
+    private GameObject nearestGate;
+    private GameObject target;
+    private Vector3 destination;
+
+    private Transform constrainedAreaCenter;
+    private int navMeshAreaMask;
+
+    private bool registeredToTarget = false;
+    #endregion
+
     void Start()
     {
-        wanderBehaviour = GetComponent<ConstrainedWanderBehaviour>();
-        attackingBehaviour = GetComponent<AttackingBehaviour>();
+        agent = GetComponent<NavMeshAgent>();
+        constrainedAreaCenter = GameObject.FindGameObjectWithTag(constrainedAreaTag).transform;
+        navMeshAreaMask = NavMesh.GetAreaFromName(navMeshAreaName);
         anim = GetComponent<Animation>();
         anim.playAutomatically = false;
         fortsGates = GameObject.FindGameObjectsWithTag("Gate");
 
-
+        #region STATE: breaching
         FSMState breaching = new FSMState();
+        breaching.enterActions.Add(() => Debug.Log("Entering breaching"));
         breaching.enterActions.Add(FindNearestGate);
-        breaching.enterActions.Add(SetNearestGateAsDestination);
+        DecisionTree breachingDT = CreateBreachingDecisionTree();
+        breaching.stayActions.Add(() => breachingDT.walk());
+        #endregion
 
+        #region STATE: wandering
         FSMState wandering = new FSMState();
         wandering.enterActions.Add(() => Debug.Log("Entering wandering"));
+        wandering.enterActions.Add(() => SetAgentWanderingParams());
         wandering.stayActions.Add(Wander);
         wandering.stayActions.Add(LookForAnEnemy);
+        wandering.exitActions.Add(() => agent.autoBraking = true);
+        #endregion
 
+        #region STATE: attacking
         FSMState attacking = new FSMState();
         attacking.enterActions.Add(() => Debug.Log("Entering attacking"));
+        DecisionTree attackingDT = CreateAttackingDecisionTree();
+        attacking.stayActions.Add(() => attackingDT.walk());
+        attacking.exitActions.Add(ReleaseTarget);
+        #endregion
 
-        attacking.enterActions.Add(() => destination = target.transform.position);
-        attacking.stayActions.Add(RunToDestination);
-        attacking.stayActions.Add(() => { 
-            if (! attackingBehaviour.IsAttacking())
-            {
-                attackingBehaviour.AttackTarget(target); anim.Play("Attack1");
-            }
-             
-        });
-        attacking.exitActions.Add(() => target = null);
-
-        FSMTransition attackingToWandering = new FSMTransition(() => ! attackingBehaviour.IsAttacking());
+        #region TRANSITIONS
+        FSMTransition attackingToWandering = new FSMTransition(IsTargetReleased);
         attacking.AddTransition(attackingToWandering, wandering);
 
-        FSMTransition wanderingToAttacking = new FSMTransition(TargetAcquired);
+        FSMTransition wanderingToAttacking = new FSMTransition(IsTargetAcquired);
         wandering.AddTransition(wanderingToAttacking, attacking);
 
-        FSMTransition tran = new FSMTransition(NearestGateIsWithingInteractionRateAndBreached);
-        breaching.AddTransition(tran, wandering);
+        FSMTransition breachingToWandering = new FSMTransition(NearestGateIsWithingInteractionRateAndBreached);
+        breaching.AddTransition(breachingToWandering, wandering);
+        #endregion
 
-        //breaching dt def
-        DTDecision isGateWithinInteractionRange = new DTDecision(IsGateWithinInteractionRange);
+        fsm = new FSM(breaching);
+        StartCoroutine(UpdateFSM());
+    }
+
+    #region METHODS: decision tree creation
+    private DecisionTree CreateBreachingDecisionTree()
+    {
+        DTDecision isGateWithinInteractionRange = new DTDecision((bundle) =>
+        {
+            return IsObjectWithinInteractionRange(nearestGate);
+        });
 
         DTAction walkingToGateAction = new DTAction(WalkToDestination);
 
         DTDecision isGateBreached = new DTDecision(IsGateBreached);
 
-        DTAction attackingGateAction = new DTAction(AttackGate);
+        DTAction attackingGateAction = new DTAction((bundle) =>
+        {
+            AcquireTarget(nearestGate);
+            return AttackTarget(null);
+        });
         DTAction goIntoFort = new DTAction(ReachFortsCenter);
 
         isGateBreached.AddLink(true, goIntoFort);
@@ -95,39 +118,107 @@ public class AttackerFSM : MonoBehaviour, IObserver
         isGateWithinInteractionRange.AddLink(false, walkingToGateAction);
         isGateWithinInteractionRange.AddLink(true, isGateBreached);
 
-        breachingDT = new DecisionTree(isGateWithinInteractionRange);
-        //end breaching dt def
-
-        breaching.stayActions.Add(WalkBreachingDT);
-
-        fsm = new FSM(breaching);
-        StartCoroutine(UpdateFSM());
+        return new DecisionTree(isGateWithinInteractionRange);
     }
 
-    private bool TargetAcquired()
+    private DecisionTree CreateAttackingDecisionTree()
     {
-        return target != null;
-    }
-
-
-    private void WalkBreachingDT()
-    {
-        if (breachingDT != null)
+        DTDecision isTargetWithinInteractionRange = new DTDecision((bundle) =>
         {
-            breachingDT.walk();
-        }
-    }
+            return IsObjectWithinInteractionRange(target);
+        });
+        DTAction seekTarget = new DTAction((bundle) =>
+        {
+            if (target != null)
+            {
+                destination = target.transform.position;
+                RunToDestination();
+                return true;
+            }
+            return false;
+        });
+        DTAction attackTarget = new DTAction(AttackTarget);
+        isTargetWithinInteractionRange.AddLink(true, attackTarget);
+        isTargetWithinInteractionRange.AddLink(false, seekTarget);
 
-    private void RunToDestination()
-    {
-        GetComponent<NavMeshAgent>().speed = runSpeed;
-        anim.Play("Run");
-        GetComponent<NavMeshAgent>().SetDestination(destination);
+        return new DecisionTree(isTargetWithinInteractionRange);
     }
+    #endregion
 
+    #region METHODS: breaching actions
     private bool NearestGateIsWithingInteractionRateAndBreached()
     {
-        return (bool)IsGateBreached(null) && (bool)IsGateWithinInteractionRange(null);
+        return (bool)IsGateBreached(null) && IsObjectWithinInteractionRange(nearestGate);
+    }
+
+
+    private object IsGateBreached(object bundle)
+    {
+        return nearestGate.gameObject.GetComponent<Gate>().IsOpen();
+    }
+
+    private void FindNearestGate()
+    {
+        nearestGate = Utils.GetNearestObject(transform.position, fortsGates);
+        destination = nearestGate.transform.position;
+    }
+    #endregion
+
+    #region METHODS: movement actions
+    private void RunToDestination()
+    {
+        agent.speed = runSpeed;
+        anim.Play("Run");
+        agent.SetDestination(destination);
+    }
+
+    private object WalkToDestination(object bundle)
+    {
+        if (destination != null)
+        {
+            anim.Play("Walk");
+            agent.speed = walkSpeed;
+            agent.SetDestination(destination);
+            return true;
+        }
+        return false;
+    }
+
+    private void Wander()
+    {
+        anim.Play("Walk");
+        agent.SetDestination(GetWanderDestination());
+    }
+
+    private void SetAgentWanderingParams()
+    {
+        agent.speed = walkSpeed;
+        agent.autoBraking = false;
+    }
+
+    private Vector3 GetWanderDestination()
+    {
+        Vector3 targetCircleCenter = transform.position + Vector3.forward * circleForwardOffset;
+        Vector2 randomPoint = UnityEngine.Random.insideUnitCircle * circleRay;
+        Vector3 wanderDestination = new Vector3(randomPoint.x, 0, randomPoint.y) + targetCircleCenter;
+
+        NavMeshHit hit;
+        bool targetOnArea = !NavMesh.Raycast(transform.position, wanderDestination, out hit, navMeshAreaMask);
+        bool agentOnArea = NavMesh.SamplePosition(transform.position, out hit, 0.1f, 8);
+
+        //if agent is on the area and target is not, find a random point on area and return it as destination
+        if (!targetOnArea)
+        {
+            Vector3 randomPositionInConstrainedArea = UnityEngine.Random.insideUnitSphere * circleForwardOffset + constrainedAreaCenter.position;
+            NavMesh.SamplePosition(randomPositionInConstrainedArea, out hit, circleForwardOffset, navMeshAreaMask);
+            wanderDestination = hit.position;
+        }
+        //if either agent and target are not on the area return constrained area center as destination
+        if (!agentOnArea && !targetOnArea)
+        {
+            wanderDestination = constrainedAreaCenter.position;
+        }
+        return wanderDestination;
     }
 
     private object ReachFortsCenter(object bundle)
@@ -138,121 +229,86 @@ public class AttackerFSM : MonoBehaviour, IObserver
         return WalkToDestination(null);
     }
 
+    #endregion
+
+    #region METHODS: attacking actions
     private void LookForAnEnemy()
     {
         Vector3 transformPos = transform.position;
         GameObject[] enemies = GameObject.FindGameObjectsWithTag("Defender");
-        Shuffle(ref enemies);
+        Utils.Shuffle(ref enemies);
         foreach (GameObject enemy in enemies)
         {
             RaycastHit hit;
             bool result = Physics.Linecast(transformPos, enemy.transform.position, out hit);
             if (result && hit.collider.gameObject.CompareTag("Defender"))
             {
-                target = hit.collider.gameObject;
+                AcquireTarget(hit.collider.gameObject);
             }
         }
     }
 
-    private void Shuffle<T>(ref T[] objs)
+
+    private object AttackTarget(object bundle)
     {
-        for (int i = 0; i < objs.Length; i++)
+        HealthController hc;
+        if (target != null && target.TryGetComponent<HealthController>(out hc))
         {
-            int rand = UnityEngine.Random.Range(0, objs.Length);
-            T temp = objs[i];
-            objs[i] = objs[rand];
-            objs[rand] = temp;
-        }
-    }
-
-    private void Wander()
-    {
-        anim.Play("Walk");
-        GetComponent<NavMeshAgent>().speed = walkSpeed / 2;
-        GetComponent<NavMeshAgent>().autoBraking = false;
-        GetComponent<NavMeshAgent>().SetDestination(wanderBehaviour.GetWanderDestination());
-
-    }
-
-
-
-    private object AttackGate(object bundle)
-    {
-        if (nearestGate != null)
-        {
-            attackingBehaviour.AttackTarget(nearestGate.gameObject);
+            if (!registeredToTarget)
+            {
+                hc.AddObserver(this);
+                registeredToTarget = true;
+            }
             anim.Play("Attack1");
+            hc.TakeDamage(damage);
             return true;
         }
         return false;
     }
+    #endregion
 
-
-
-    /*private void FindAnAlly()
+    #region METHODS: utilities
+    private void AcquireTarget(GameObject pTarget)
     {
-        GameObject[] allies = GameObject.FindGameObjectsWithTag("Attacker");
-        if (allies.Length == 0) return;
-        RaycastHit hit;
-        allies = allies.Where(ally => Physics.Raycast(transform.position, ally.transform.position, out hit, 1000)).ToArray();
-        hordeReference = allies.OrderBy(ally => Vector3.Distance(gameObject.transform.position, ally.transform.position)).ElementAt(0);
-    }*/
-
-    private object IsGateWithinInteractionRange(object bundle)
-    {
-        return Vector3.Distance(gameObject.transform.position, nearestGate.position) < interactionRay;
-    }
-
-    private object IsGateBreached(object bundle)
-    {
-        return nearestGate.gameObject.GetComponent<Gate>().IsOpen();
-    }
-
-    private void SetNearestGateAsDestination()
-    {
-        destination = nearestGate.position;
-    }
-
-    private object WalkToDestination(object bundle)
-    {
-        if (destination != null)
+        HealthController hc;
+        if (pTarget.TryGetComponent<HealthController>(out hc))
         {
-            anim.Play("Walk");
-            GetComponent<NavMeshAgent>().speed = walkSpeed;
-            GetComponent<NavMeshAgent>().SetDestination(destination);
-            return true;
+            hc.AddObserver(this);
+            registeredToTarget = true;
         }
-        return false;
+        target = pTarget;
     }
 
-    private void Attack()
+    private void ReleaseTarget()
     {
-        if (target != null && ! attackingCoroutineRunning)
+        if (target != null)
         {
-            Debug.Log("Starting attacking coroutine");
-            attackingCoroutineRunning = true;
-            StartCoroutine(AttackTarget());
+            HealthController hc;
+            if (target.TryGetComponent<HealthController>(out hc)) hc.RemoveObserver(this);
+            registeredToTarget = false;
+            target = null;
         }
     }
 
-
-    private void FindNearestGate()
+    private bool IsObjectWithinInteractionRange(GameObject obj)
     {
-        nearestGate = GetNearestGatePosition();
-        SetNearestGateAsDestination();
+        return obj != null ? Vector3.Distance(transform.position, obj.transform.position) < interactionRange : false;
     }
 
-    private Transform GetNearestGatePosition()
+
+    private bool IsTargetAcquired()
     {
-        ArrayList distances = new ArrayList();
-        foreach (GameObject gateObject in fortsGates)
-        {
-            Gate gate = gateObject.GetComponent<Gate>();
-            distances.Add((gateObject.transform.position - gameObject.transform.position).sqrMagnitude);
-            
-        }
-        return fortsGates[distances.IndexOf(distances.ToArray().Min())].transform;
+        return target != null;
     }
+
+    private bool IsTargetReleased()
+    {
+        return target == null;
+    }
+
+
+    #endregion
+
 
     IEnumerator UpdateFSM()
     {
@@ -263,28 +319,22 @@ public class AttackerFSM : MonoBehaviour, IObserver
         }
     }
 
-    IEnumerator AttackTarget()
-    {
-        GameObject targetMemo = target;
-        target.GetComponent<HealthController>().AddObserver(this);
-        while (target != null)
-        {
-            anim.Play("Attack1");
-            Debug.Log(gameObject.name + " is attacking!");
-            target.SendMessage("TakeDamage", 10);
-            yield return new WaitForSeconds(attackCooldown);
-
-        }
-        targetMemo.GetComponent<HealthController>().RemoveObserver(this);
-        anim.Play("Idle");
-        attackingCoroutineRunning = false;
-    }
 
     public void OnNotify(GameObject subject, object status)
     {
-        if (subject.CompareTag("Gate") && (int)status == 0)
+        if ((int)status == 0)
         {
-            target = null;
+            ReleaseTarget();
         }
     }
+
+    /*private void FindAnAlly()
+    {
+        GameObject[] allies = GameObject.FindGameObjectsWithTag("Attacker");
+        if (allies.Length == 0) return;
+        RaycastHit hit;
+        allies = allies.Where(ally => Physics.Raycast(transform.position, ally.transform.position, out hit, 1000)).ToArray();
+        hordeReference = allies.OrderBy(ally => Vector3.Distance(gameObject.transform.position, ally.transform.position)).ElementAt(0);
+    }*/
+
 }

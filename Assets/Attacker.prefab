@@ -1899,7 +1899,6 @@ GameObject:
   - component: {fileID: 342815648673576221}
   - component: {fileID: 5306343670091542464}
   - component: {fileID: 3193210427352374717}
-  - component: {fileID: 3251729413286185688}
   m_Layer: 0
   m_Name: Attacker
   m_TagString: Attacker
@@ -2010,27 +2009,13 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 7
   attackCooldown: 2
-  interactionRay: 4
+  interactionRange: 5
   nearestGate: {fileID: 0}
   target: {fileID: 0}
   destination: {x: 0, y: 0, z: 0}
-  hordeReference: {fileID: 0}
   forwardOffset: 5
-  circleRay: 3
---- !u!114 &3251729413286185688
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3156135342966150931}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7e86a446d66277140b7958f33f7ec1df, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
   circleForwardOffset: 5
-  circleRay: 5
+  circleRay: 3
   constrainedAreaTag: Yard
   navMeshAreaName: FortYard
 --- !u!1 &3156135342966150935

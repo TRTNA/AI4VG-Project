@@ -42,7 +42,8 @@ public class HealthController : Target, ISubject
 
     public void Notify()
     {
-        foreach (IObserver observer in observers)
+        //shallow copy of list to allow called observers to remove theirsevlves inside the OnNotify method
+        foreach (IObserver observer in new List<IObserver>(observers))
         {
             observer.OnNotify(gameObject, 0);
         }
