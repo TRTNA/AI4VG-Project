@@ -6,6 +6,8 @@ public class HealthController : Target, ISubject
 {
     public List<IObserver> observers = new List<IObserver>(); 
     public float _health = 100f;
+    private float health = 100f;
+    private OnHealthDroppedToZero onHealthDroppedToZero;
 
     public float Health
     {
@@ -20,6 +22,7 @@ public class HealthController : Target, ISubject
                 _health = 0;
                 Notify();
                 observers.Clear();
+                onHealthDroppedToZero?.Invoke();
             } else
             {
                 _health = value;
@@ -38,6 +41,14 @@ public class HealthController : Target, ISubject
     {
         Debug.Log(gameObject.name + " suffered " + damage + " damages");
         Health -= damage;
+    }
+
+    public void SetOnHealthDroppedToZero(OnHealthDroppedToZero callback)
+    {
+        if (callback != null)
+        {
+            onHealthDroppedToZero = callback;
+        }
     }
 
     public void Notify()
@@ -65,3 +76,5 @@ public class HealthController : Target, ISubject
         }
     }
 }
+
+public delegate void OnHealthDroppedToZero();

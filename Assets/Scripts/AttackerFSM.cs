@@ -47,8 +47,10 @@ public class AttackerFSM : MonoBehaviour, IObserver
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
+        
         constrainedAreaCenter = GameObject.FindGameObjectWithTag(constrainedAreaTag).transform;
         navMeshAreaMask = NavMesh.GetAreaFromName(navMeshAreaName);
+        GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
         anim = GetComponent<Animation>();
         anim.playAutomatically = false;
         fortsGates = GameObject.FindGameObjectsWithTag("Gate");
@@ -319,6 +321,16 @@ public class AttackerFSM : MonoBehaviour, IObserver
         }
     }
 
+    private void OnKilled()
+    {
+        gameObject.GetComponent<AttackerFSM>().enabled = false;
+        gameObject.GetComponent<NavMeshAgent>().enabled = false;
+        //modify this using Animator instead of Animation
+        anim["Death"].wrapMode = WrapMode.Once;
+        anim.Play("Death");
+        StartCoroutine(Die());
+    }
+
 
     public void OnNotify(GameObject subject, object status)
     {
@@ -326,6 +338,12 @@ public class AttackerFSM : MonoBehaviour, IObserver
         {
             ReleaseTarget();
         }
+    }
+
+    private IEnumerator Die()
+    {
+        yield return new WaitForSeconds(0.8f);
+        Destroy(gameObject);
     }
 
     /*private void FindAnAlly()
