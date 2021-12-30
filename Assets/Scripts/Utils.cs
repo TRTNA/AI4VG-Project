@@ -38,4 +38,17 @@ public static class Utils
     {
         return Utils.GetNearestObject(source, new List<GameObject>(objs).FindAll(predicate).ToArray());
     }
+
+    public static GameObject[] SortByDistance(Vector3 source, GameObject[] objs)
+    {
+        List<GameObject> temp = new List<GameObject>(objs);
+        temp.Sort((go1, go2) => {
+
+            var d1 = Vector3.Distance(source, go1.transform.position);
+            var d2 = Vector3.Distance(source, go2.transform.position);
+            if (d1 == d2) return 0;
+            return d1 > d2 ? 1 : -1;
+        });
+        return temp.ToArray();
+    }
 }

@@ -4,7 +4,7 @@ using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-
+[RequireComponent(typeof(HealthController))]
 public class AttackerFSM : MonoBehaviour, IObserver
 {
     #region public variables declarations

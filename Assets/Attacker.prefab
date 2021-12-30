@@ -1899,6 +1899,8 @@ GameObject:
   - component: {fileID: 342815648673576221}
   - component: {fileID: 5306343670091542464}
   - component: {fileID: 3193210427352374717}
+  - component: {fileID: 8468183941875158932}
+  - component: {fileID: 2335201116853790687}
   m_Layer: 0
   m_Name: Attacker
   m_TagString: Attacker
@@ -1961,7 +1963,7 @@ NavMeshAgent:
   m_Acceleration: 8
   avoidancePriority: 50
   m_AngularSpeed: 120
-  m_StoppingDistance: 2
+  m_StoppingDistance: 5
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1
@@ -2000,24 +2002,42 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ef0647777bfc793459ac015c760a4500, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  fortsGates:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
   reactionTime: 1
-  walkSpeed: 3
+  walkSpeed: 1
   runSpeed: 7
-  attackCooldown: 2
   interactionRange: 5
-  nearestGate: {fileID: 0}
-  target: {fileID: 0}
-  destination: {x: 0, y: 0, z: 0}
-  forwardOffset: 5
-  circleForwardOffset: 5
-  circleRay: 3
+  damage: 1
   constrainedAreaTag: Yard
   navMeshAreaName: FortYard
+  circleForwardOffset: 5
+  circleRay: 3
+--- !u!114 &8468183941875158932
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3156135342966150931}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d9117b4e9329c14da90eb1e783765ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _health: 20
+--- !u!136 &2335201116853790687
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3156135342966150931}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  m_Radius: 0.9
+  m_Height: 5
+  m_Direction: 1
+  m_Center: {x: 0, y: 1.59, z: 0}
 --- !u!1 &3156135342966150935
 GameObject:
   m_ObjectHideFlags: 0
