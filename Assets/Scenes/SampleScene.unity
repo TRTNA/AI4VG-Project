@@ -1391,7 +1391,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 185a2e8324d717345821d4e5b5d3595c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  toSpawn: {fileID: 3156135342965918515, guid: a9053efac53e3f64d8cc653516be39a0, type: 3}
+  toSpawn: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
   unitsAvailable: 10
   spawnCooldown: 2
   yOffset: 1

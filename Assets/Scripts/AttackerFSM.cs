@@ -31,7 +31,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
     private FSM fsm;
 
     private NavMeshAgent agent;
-    private Animation anim;
+    private Animator anim;
 
     private GameObject[] fortsGates;
     private GameObject nearestGate;
@@ -51,8 +51,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
         constrainedAreaCenter = GameObject.FindGameObjectWithTag(constrainedAreaTag).transform;
         navMeshAreaMask = NavMesh.GetAreaFromName(navMeshAreaName);
         GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
-        anim = GetComponent<Animation>();
-        anim.playAutomatically = false;
+        anim = GetComponent<Animator>();
         fortsGates = GameObject.FindGameObjectsWithTag("Gate");
 
         #region STATE: breaching
@@ -170,7 +169,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
     private void RunToDestination()
     {
         agent.speed = runSpeed;
-        anim.Play("Run");
+        anim.Play("Base Layer.Run");
         agent.SetDestination(destination);
     }
 
@@ -178,7 +177,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
     {
         if (destination != null)
         {
-            anim.Play("Walk");
+            anim.Play("Base Layer.Walk");
             agent.speed = walkSpeed;
             agent.SetDestination(destination);
             return true;
@@ -188,7 +187,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
     private void Wander()
     {
-        anim.Play("Walk");
+        anim.Play("Base Layer.Walk");
         agent.SetDestination(GetWanderDestination());
     }
 
@@ -261,7 +260,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
                 hc.AddObserver(this);
                 registeredToTarget = true;
             }
-            anim.Play("Attack1");
+            anim.Play("Base Layer.Attack");
             hc.TakeDamage(damage);
             return true;
         }
@@ -323,12 +322,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
     private void OnKilled()
     {
-        gameObject.GetComponent<AttackerFSM>().enabled = false;
-        gameObject.GetComponent<NavMeshAgent>().enabled = false;
-        //modify this using Animator instead of Animation
-        anim["Death"].wrapMode = WrapMode.Once;
-        anim.Play("Death");
-        StartCoroutine(Die());
+        Destroy(gameObject);
     }
 
 
@@ -342,7 +336,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
     private IEnumerator Die()
     {
-        yield return new WaitForSeconds(0.8f);
+        yield return new WaitForSeconds(3f);
         Destroy(gameObject);
     }
 
