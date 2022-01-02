@@ -5,12 +5,19 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
+[RequireComponent(typeof(HealthController))]
 public class DefenderFSM : MonoBehaviour
 {
     [Range(1, 100)]
     public float attackRange = 10f;
     [Range(1, 100)]
     public float attackDamage = 5f;
+    [Range(1, 100)]
+    public float surroundedRange = 5f;
+    [Range(1, 20)]
+    public int surroundedThreshold = 3;
+    [Range(1, 20)]
+    public float fleeDistance = 3f;
 
     [Range(0.1f, 10)]
     public float reactionTime = 0.5f;
@@ -24,15 +31,18 @@ public class DefenderFSM : MonoBehaviour
     public float arrivingRange = 1f;
     public GameObject allyToHelp;
 
+    public GameObject[] enemiesSurrounding;
+
 
     public GameObject projectile;
 
 
-
+    private int navMeshAreaMask;
     private FSM fsm;
     private GameObject[] defensivePositions;
     private NavMeshAgent agent;
     private DefendersCooperationController dcc;
+    private GameObject fort;
 
     // Start is called before the first frame update
     void Start()
@@ -40,6 +50,8 @@ public class DefenderFSM : MonoBehaviour
         defensivePositions = GameObject.FindGameObjectsWithTag("DefensivePosition");
         agent = GetComponent<NavMeshAgent>();
         dcc = GameObject.Find("DefendersCooperationController").GetComponent<DefendersCooperationController>();
+        navMeshAreaMask = 1<<NavMesh.GetAreaFromName("Fort");
+        Debug.Log(navMeshAreaMask);
 
         //horde control bt
         BTAction pickAnEnemy = new BTAction(PickAnEnemy);
@@ -92,16 +104,95 @@ public class DefenderFSM : MonoBehaviour
 
 
         //main Selector
-        BTSelector root = new BTSelector(new IBTTask[] { hordeControl, backToDefPosSequence, helpOrAttackSelector});
+        BTSelector defendWallsBTRoot = new BTSelector(new IBTTask[] { hordeControl, backToDefPosSequence, helpOrAttackSelector});
 
-        BehaviorTree bt = new BehaviorTree(root);
+        BehaviorTree defendWallsBT = new BehaviorTree(defendWallsBTRoot);
 
         FSMState defendWalls = new FSMState();
-        defendWalls.stayActions.Add(() => bt.Step());
+        defendWalls.stayActions.Add(() => defendWallsBT.Step());
+
+
+        //DEFEND WALLS BT
+        BTSequence surroundedSequence = new BTSequence(new IBTTask[] { new BTCondition(AmISurrounded), new BTAction(Flee) });
+        BTSelector temp = new BTSelector(new IBTTask[] { surroundedSequence, normalAttackSequence });
+
+        BehaviorTree defendYardBT = new BehaviorTree(surroundedSequence);
+        
+        
+        FSMState defendYard = new FSMState();
+        defendYard.stayActions.Add(() => defendYardBT.Step());
+
+        FSMTransition fortBreached = new FSMTransition(() => true);
+        defendWalls.AddTransition(fortBreached, defendYard);
+
 
         fsm = new FSM(defendWalls);
         StartCoroutine(UpdateFSM());
 
+    }
+
+    private bool Flee()
+    {
+        //temporary
+        if (enemiesSurrounding == null || enemiesSurrounding.Length == 0) return agent.SetDestination(Vector3.zero);
+
+        Vector3 averageEnemiesDirection = new Vector3();
+        for (int i = 0; i < enemiesSurrounding.Length; i++)
+        {
+            Vector3 dir = Vector3.ProjectOnPlane(enemiesSurrounding[i].transform.position - transform.position, Vector3.up);
+            averageEnemiesDirection += dir;
+        }
+
+        averageEnemiesDirection /= enemiesSurrounding.Length;
+        Vector3 fleeDirection = (-averageEnemiesDirection).normalized;
+        Vector3 fleeDestination = transform.position + fleeDirection * fleeDistance;
+        NavMeshHit hit;
+
+        if (NavMesh.SamplePosition(fleeDestination, out hit, 3f, navMeshAreaMask))
+        {
+            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
+            return agent.SetDestination(hit.position);
+        }
+
+        Vector3 left = transform.position + Quaternion.Euler(0, -90, 0) * fleeDirection * fleeDistance;
+
+        if (NavMesh.SamplePosition(left, out hit, 3f, navMeshAreaMask))
+        {
+            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
+
+            return agent.SetDestination(hit.position);
+        }
+
+        Vector3 right = transform.position + Quaternion.Euler(0, 90, 0) * fleeDirection * fleeDistance;
+        Debug.DrawLine(transform.position, right, Color.red, 5f);
+
+        if (NavMesh.SamplePosition(right, out hit, 3f ,navMeshAreaMask))
+        {
+            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
+
+            return agent.SetDestination(hit.position);
+        }
+        //temporary
+        return agent.SetDestination(Vector3.zero);
+
+    }
+
+    private bool AmISurrounded()
+    {
+        Collider[] objectsAround = Physics.OverlapSphere(transform.position, surroundedRange);
+        List<GameObject> enemies = new List<GameObject>();
+        int count = 0;
+        foreach (var coll in objectsAround)
+        {
+            if (coll.gameObject.CompareTag("Attacker"))
+            {
+                enemies.Add(coll.gameObject);
+                count++;
+                
+            }
+        }
+        enemiesSurrounding = enemies.ToArray();
+        return count >= surroundedThreshold;
     }
 
     private bool DoesAnyoneNeedsHelp()

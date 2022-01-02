@@ -49,7 +49,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
         agent = GetComponent<NavMeshAgent>();
         
         constrainedAreaCenter = GameObject.FindGameObjectWithTag(constrainedAreaTag).transform;
-        navMeshAreaMask = NavMesh.GetAreaFromName(navMeshAreaName);
+        navMeshAreaMask = 1 << NavMesh.GetAreaFromName(navMeshAreaName);
         GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
         anim = GetComponent<Animator>();
         fortsGates = GameObject.FindGameObjectsWithTag("Gate");
@@ -240,12 +240,8 @@ public class AttackerFSM : MonoBehaviour, IObserver
         Utils.Shuffle(ref enemies);
         foreach (GameObject enemy in enemies)
         {
-            RaycastHit hit;
-            bool result = Physics.Linecast(transformPos, enemy.transform.position, out hit);
-            if (result && hit.collider.gameObject.CompareTag("Defender"))
-            {
-                AcquireTarget(hit.collider.gameObject);
-            }
+                AcquireTarget(enemy);
+  
         }
     }
 

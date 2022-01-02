@@ -122,9 +122,9 @@ MonoBehaviour:
   walkSpeed: 1.5
   runSpeed: 3
   interactionRange: 5
-  damage: 10
+  damage: 1
   constrainedAreaTag: Yard
-  navMeshAreaName: FortYard
+  navMeshAreaName: Fort
   circleForwardOffset: 5
   circleRay: 5
 --- !u!136 &979602514836018303
