@@ -56,7 +56,6 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
         #region STATE: breaching
         FSMState breaching = new FSMState();
-        breaching.enterActions.Add(() => Debug.Log("Entering breaching"));
         breaching.enterActions.Add(FindNearestGate);
         DecisionTree breachingDT = CreateBreachingDecisionTree();
         breaching.stayActions.Add(() => breachingDT.walk());
@@ -64,7 +63,6 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
         #region STATE: wandering
         FSMState wandering = new FSMState();
-        wandering.enterActions.Add(() => Debug.Log("Entering wandering"));
         wandering.enterActions.Add(() => SetAgentWanderingParams());
         wandering.stayActions.Add(Wander);
         wandering.stayActions.Add(LookForAnEnemy);
@@ -73,7 +71,6 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
         #region STATE: attacking
         FSMState attacking = new FSMState();
-        attacking.enterActions.Add(() => Debug.Log("Entering attacking"));
         DecisionTree attackingDT = CreateAttackingDecisionTree();
         attacking.stayActions.Add(() => attackingDT.walk());
         attacking.exitActions.Add(ReleaseTarget);

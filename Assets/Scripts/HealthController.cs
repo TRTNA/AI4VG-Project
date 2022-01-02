@@ -39,7 +39,6 @@ public class HealthController : Target, ISubject
 
     public override void TakeDamage(float damage)
     {
-        Debug.Log(gameObject.name + " suffered " + damage + " damages");
         Health -= damage;
     }
 

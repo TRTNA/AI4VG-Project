@@ -18,6 +18,8 @@ public class DefenderFSM : MonoBehaviour
     public int surroundedThreshold = 3;
     [Range(1, 20)]
     public float fleeDistance = 3f;
+    [Range(1, 10)]
+    public float rotationSpeed = 5f;
 
     [Range(0.1f, 10)]
     public float reactionTime = 0.5f;
@@ -51,6 +53,7 @@ public class DefenderFSM : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         dcc = GameObject.Find("DefendersCooperationController").GetComponent<DefendersCooperationController>();
         navMeshAreaMask = 1<<NavMesh.GetAreaFromName("Fort");
+        GetComponent<HealthController>().SetOnHealthDroppedToZero(() => Destroy(gameObject));
         Debug.Log(navMeshAreaMask);
 
         //horde control bt
@@ -112,29 +115,156 @@ public class DefenderFSM : MonoBehaviour
         defendWalls.stayActions.Add(() => defendWallsBT.Step());
 
 
-        //DEFEND WALLS BT
+        /*//DEFEND WALLS BT
         BTSequence surroundedSequence = new BTSequence(new IBTTask[] { new BTCondition(AmISurrounded), new BTAction(Flee) });
-        BTSelector temp = new BTSelector(new IBTTask[] { surroundedSequence, normalAttackSequence });
 
-        BehaviorTree defendYardBT = new BehaviorTree(surroundedSequence);
+        BTSequence onHelpAttackSequence = new BTSequence(new IBTTask[] { lookAtTarget, new BTCondition(TargetIsInRange) , new BTCondition(IsTargetInSight), new BTAction(AttackTarget) });
+        BTDecoratorUntilFail repeatOnHelpAttackSequence = new BTDecoratorUntilFail(onHelpAttackSequence);
+        BTSequence helpAlliesSequence2 = new BTSequence(new IBTTask[] { new BTCondition(AreAlliesSurrounded), new BTAction(PickEnemyWhoIsSurroundingAlly), repeatOnHelpAttackSequence });
+        BTSelector temp = new BTSelector(new IBTTask[] { surroundedSequence, helpAlliesSequence2 });*/
+
+        BehaviorTree defendYardBT = new BehaviorTree(null);
         
         
         FSMState defendYard = new FSMState();
-        defendYard.stayActions.Add(() => defendYardBT.Step());
+        defendYard.exitActions.Add(() => { target = null; allyToHelp = null; });
+        defendYard.enterActions.Add(() => Debug.Log("Entering defend yard"));
 
-        FSMTransition fortBreached = new FSMTransition(() => true);
-        defendWalls.AddTransition(fortBreached, defendYard);
+        defendYard.stayActions.Add(AttackEnemyInsideFort);
+
+        FSMState flee = new FSMState();
+        flee.enterActions.Add(() => agent.autoBraking = false);
+        flee.enterActions.Add(() => Debug.Log("Entering flee"));
 
 
+        flee.stayActions.Add(Flee);
+        flee.exitActions.Add(() => agent.autoBraking = true);
+
+        FSMState helpAlly = new FSMState();
+        helpAlly.stayActions.Add(() =>
+        {
+            if (allyToHelp == null)
+            {
+                allyToHelp = Utils.GetNearestObject(transform.position, GetNearbySurroundedAllies());
+                if (allyToHelp == null) return;
+            }
+            float distanceToally = Vector3.Distance(transform.position, allyToHelp.transform.position);
+            if (distanceToally > attackRange)
+            {
+                
+                Vector3 directionTowardAlly = (allyToHelp.transform.position - transform.position).normalized;
+                agent.SetDestination(transform.position + directionTowardAlly * (distanceToally - attackRange));
+                return;
+            }
+            target = PickEnemyWhoIsSurroundingAlly();
+            AttackTarget();
+            
+
+
+        });
+        helpAlly.exitActions.Add(() => allyToHelp = null);
+
+        FSMTransition defendToHelp = new FSMTransition(() => dcc.IsAnyoneSurrounded().Length != 0);
+        defendYard.AddTransition(defendToHelp, helpAlly);
+        FSMTransition helpToFlee = new FSMTransition(AmISurrounded);
+        helpAlly.AddTransition(helpToFlee, flee);
+
+
+        FSMTransition fromDefendToFlee = new FSMTransition(AmISurrounded);
+        defendYard.AddTransition(fromDefendToFlee, flee);
+
+        FSMTransition fromFleeToDefend = new FSMTransition(AmIClear);
+        flee.AddTransition(fromFleeToDefend, defendYard);
+
+        FSMTransition wallsToYard = new FSMTransition(() => !IsFortClear());
+        FSMTransition yardToWalls = new FSMTransition(IsFortClear);
+
+        defendWalls.AddTransition(wallsToYard, defendYard);
+        defendYard.AddTransition(yardToWalls, defendWalls);
+
+        defendWalls.enterActions.Add(() => Debug.Log("Entering defend walls"));
         fsm = new FSM(defendWalls);
         StartCoroutine(UpdateFSM());
 
     }
 
-    private bool Flee()
+    private bool IsFortClear()
     {
+        GameObject[] attackers = GameObject.FindGameObjectsWithTag("Attacker");
+        NavMeshHit hit;
+        foreach (var attacker in attackers)
+        {
+            if (NavMesh.SamplePosition(attacker.transform.position,out hit, 0.01f, 1<<NavMesh.GetAreaFromName("Fort")))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void AttackEnemyInsideFort()
+    {
+        if (target == null) PickAnEnemy();
+        if (!TargetIsInRange())
+        {
+            target = null;
+            return;
+        }
+        target.GetComponent<HealthController>().TakeDamage(attackDamage);
+        if (target.GetComponent<HealthController>().Health == 0) target = null;
+    }
+
+    private GameObject[] GetNearbySurroundedAllies()
+    {
+        GameObject[] surroundedAllies = dcc.IsAnyoneSurrounded();
+        List<GameObject> nearbySurroundedAllies = new List<GameObject>();
+        foreach (var ally in surroundedAllies)
+        {
+            if (Vector3.Distance(transform.position, ally.transform.position) < attackRange)
+            {
+                nearbySurroundedAllies.Add(ally);
+            }
+        }
+        return nearbySurroundedAllies.ToArray();
+
+    }
+
+    private GameObject PickEnemyWhoIsSurroundingAlly()
+    {
+        Collider[] colls = Physics.OverlapSphere(allyToHelp.transform.position, surroundedRange);
+        List<GameObject> enemies = new List<GameObject>();
+        foreach (var coll in colls)
+        {
+            if (coll.gameObject.CompareTag("Attacker")) enemies.Add(coll.gameObject);
+        }
+        if (enemies.Count == 0) return null;
+        return enemies[0];
+    }
+
+    private bool TargetIsInRange()
+    {
+        if (target != null) return Vector3.Distance(target.transform.position, transform.position) < attackRange;
+        return false;
+    }
+
+    private void Flee()
+    {
+        Collider[] objectsAround = Physics.OverlapSphere(transform.position, surroundedRange);
+        List<GameObject> enemies = new List<GameObject>();
+        int count = 0;
+        foreach (var coll in objectsAround)
+        {
+            if (coll.gameObject.CompareTag("Attacker"))
+            {
+                enemies.Add(coll.gameObject);
+                count++;
+
+            }
+        }
+        enemiesSurrounding = enemies.ToArray();
+
         //temporary
-        if (enemiesSurrounding == null || enemiesSurrounding.Length == 0) return agent.SetDestination(Vector3.zero);
+        if (enemiesSurrounding == null || enemiesSurrounding.Length == 0) agent.SetDestination(Vector3.zero);
 
         Vector3 averageEnemiesDirection = new Vector3();
         for (int i = 0; i < enemiesSurrounding.Length; i++)
@@ -151,7 +281,8 @@ public class DefenderFSM : MonoBehaviour
         if (NavMesh.SamplePosition(fleeDestination, out hit, 3f, navMeshAreaMask))
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
-            return agent.SetDestination(hit.position);
+             agent.SetDestination(hit.position);
+            return;
         }
 
         Vector3 left = transform.position + Quaternion.Euler(0, -90, 0) * fleeDirection * fleeDistance;
@@ -160,7 +291,8 @@ public class DefenderFSM : MonoBehaviour
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
 
-            return agent.SetDestination(hit.position);
+             agent.SetDestination(hit.position);
+            return;
         }
 
         Vector3 right = transform.position + Quaternion.Euler(0, 90, 0) * fleeDirection * fleeDistance;
@@ -170,14 +302,16 @@ public class DefenderFSM : MonoBehaviour
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
 
-            return agent.SetDestination(hit.position);
+             agent.SetDestination(hit.position);
+            return;
         }
+
         //temporary
-        return agent.SetDestination(Vector3.zero);
+        agent.SetDestination(Vector3.zero);
 
     }
 
-    private bool AmISurrounded()
+    public bool AmISurrounded()
     {
         Collider[] objectsAround = Physics.OverlapSphere(transform.position, surroundedRange);
         List<GameObject> enemies = new List<GameObject>();
@@ -188,16 +322,20 @@ public class DefenderFSM : MonoBehaviour
             {
                 enemies.Add(coll.gameObject);
                 count++;
-                
             }
         }
         enemiesSurrounding = enemies.ToArray();
         return count >= surroundedThreshold;
     }
 
+    public bool AmIClear()
+    {
+        return !AmISurrounded();
+    }
+
     private bool DoesAnyoneNeedsHelp()
     {
-        allyToHelp = dcc.DoesItNeedToHelp(gameObject);
+        allyToHelp = dcc.DoesItNeedHelpWithHorde(gameObject);
         return allyToHelp != null;
     }
 
@@ -205,7 +343,7 @@ public class DefenderFSM : MonoBehaviour
     {
         if (allyToHelp != null)
         {
-            return dcc.HelpDefender(gameObject, allyToHelp);
+            return dcc.HelpDefenderWithHorde(gameObject, allyToHelp);
         }
         return false;
     }
@@ -219,7 +357,7 @@ public class DefenderFSM : MonoBehaviour
 
     private bool DoesAllyStillNeedsHelp()
     {
-        return dcc.DoesItStillNeedHelp(gameObject, allyToHelp);
+        return dcc.DoesItStillNeedHelpWithHorde(gameObject, allyToHelp);
     }
 
     private bool IsOutsideDefensivePosition()
@@ -349,4 +487,16 @@ public class DefenderFSM : MonoBehaviour
             onDefensivePosition = false;
         }
     }
+
+    private void FixedUpdate()
+    {
+        if (target != null)
+        {
+            var targetRotation = Quaternion.LookRotation(target.transform.position - transform.position);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+        }
+        
+    }
+
+
 }

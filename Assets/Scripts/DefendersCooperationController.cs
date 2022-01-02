@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DefendersCooperationController : MonoBehaviour
+public class DefendersCooperationController : MonoBehaviour, IObserver
 {
     public float updateRate = 1f;
 
@@ -22,12 +22,13 @@ public class DefendersCooperationController : MonoBehaviour
         {
             hordeStatus.Add(def, false);
             whoIsHelpingWho.Add(def, null);
+            def.GetComponent<HealthController>().AddObserver(this);
         }
         StartCoroutine(UpdateStatus());
     }
 
     //returns a defender if otherDef has to help, otherwise it returns null
-    public GameObject DoesItNeedToHelp(GameObject otherDef)
+    public GameObject DoesItNeedHelpWithHorde(GameObject otherDef)
     {
         List<GameObject> toHelp = new List<GameObject>();
         foreach (var item in hordeStatus)
@@ -40,7 +41,7 @@ public class DefendersCooperationController : MonoBehaviour
         return Utils.GetNearestObject(otherDef.transform.position, toHelp.ToArray());
     }
 
-    public bool HelpDefender(GameObject helper, GameObject helpee)
+    public bool HelpDefenderWithHorde(GameObject helper, GameObject helpee)
     {
         if (whoIsHelpingWho[helpee] == null)
         {
@@ -59,9 +60,19 @@ public class DefendersCooperationController : MonoBehaviour
         }
     }
 
-    public bool DoesItStillNeedHelp(GameObject helper, GameObject helpee)
+    public bool DoesItStillNeedHelpWithHorde(GameObject helper, GameObject helpee)
     {
         return whoIsHelpingWho[helpee] == helper;
+    }
+
+    public GameObject[] IsAnyoneSurrounded()
+    {
+        List<GameObject> surroundedAllies = new List<GameObject>();
+        foreach (var ally in defenders)
+        {
+            if (ally.GetComponent<DefenderFSM>().AmISurrounded()) surroundedAllies.Add(ally);
+        }
+        return surroundedAllies.ToArray();
     }
 
     IEnumerator UpdateStatus()
@@ -82,6 +93,17 @@ public class DefendersCooperationController : MonoBehaviour
                 
             }
             yield return new WaitForSeconds(updateRate);
+        }
+    }
+
+    public void OnNotify(GameObject subject, object status)
+    {
+        if (status.GetType() == typeof(int) && (int)status == 0)
+        {
+            subject.GetComponent<HealthController>().RemoveObserver(this);
+            List<GameObject> temp = new List<GameObject>(defenders);
+            temp.Remove(subject);
+            defenders = temp.ToArray();
         }
     }
 }

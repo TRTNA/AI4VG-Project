@@ -30,4 +30,9 @@ public class Gate : MonoBehaviour, IObserver
         return isOpen;
     }
 
+    private void OnBreached()
+    {
+        isOpen = true;
+    }
+
 }
