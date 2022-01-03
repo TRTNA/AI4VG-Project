@@ -1,4 +1,5 @@
 using CRBT;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -53,13 +54,11 @@ public class DefenderFSM : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         dcc = GameObject.Find("DefendersCooperationController").GetComponent<DefendersCooperationController>();
         navMeshAreaMask = 1<<NavMesh.GetAreaFromName("Fort");
-        GetComponent<HealthController>().SetOnHealthDroppedToZero(() => Destroy(gameObject));
-        Debug.Log(navMeshAreaMask);
+        GetComponent<HealthController>().SetOnHealthDroppedToZero(() => StartCoroutine(OnKilled()));
 
         //horde control bt
         BTAction pickAnEnemy = new BTAction(PickAnEnemy);
-        BTAction lookAtTarget = new BTAction(LookAtTarget);
-        BTSequence attackSequence = new BTSequence(new IBTTask[] { lookAtTarget, new BTCondition(IsTargetInSight), new BTAction(AttackTarget) });
+        BTSequence attackSequence = new BTSequence(new IBTTask[] { new BTCondition(IsTargetInSight), new BTAction(AttackTarget) });
         BTDecoratorUntilFail repeatAttackSequence = new BTDecoratorUntilFail(attackSequence);
         BTSequence hordeControl = new BTSequence(new IBTTask[] { new BTCondition(HasHorde), pickAnEnemy, repeatAttackSequence});
         
@@ -115,26 +114,18 @@ public class DefenderFSM : MonoBehaviour
         defendWalls.stayActions.Add(() => defendWallsBT.Step());
 
 
-        /*//DEFEND WALLS BT
-        BTSequence surroundedSequence = new BTSequence(new IBTTask[] { new BTCondition(AmISurrounded), new BTAction(Flee) });
-
-        BTSequence onHelpAttackSequence = new BTSequence(new IBTTask[] { lookAtTarget, new BTCondition(TargetIsInRange) , new BTCondition(IsTargetInSight), new BTAction(AttackTarget) });
-        BTDecoratorUntilFail repeatOnHelpAttackSequence = new BTDecoratorUntilFail(onHelpAttackSequence);
-        BTSequence helpAlliesSequence2 = new BTSequence(new IBTTask[] { new BTCondition(AreAlliesSurrounded), new BTAction(PickEnemyWhoIsSurroundingAlly), repeatOnHelpAttackSequence });
-        BTSelector temp = new BTSelector(new IBTTask[] { surroundedSequence, helpAlliesSequence2 });*/
-
         BehaviorTree defendYardBT = new BehaviorTree(null);
         
         
         FSMState defendYard = new FSMState();
         defendYard.exitActions.Add(() => { target = null; allyToHelp = null; });
-        defendYard.enterActions.Add(() => Debug.Log("Entering defend yard"));
+        defendYard.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend yard"));
 
         defendYard.stayActions.Add(AttackEnemyInsideFort);
 
         FSMState flee = new FSMState();
         flee.enterActions.Add(() => agent.autoBraking = false);
-        flee.enterActions.Add(() => Debug.Log("Entering flee"));
+        flee.enterActions.Add(() => Debug.Log(gameObject.name + " Entering flee"));
 
 
         flee.stayActions.Add(Flee);
@@ -163,11 +154,14 @@ public class DefenderFSM : MonoBehaviour
 
         });
         helpAlly.exitActions.Add(() => allyToHelp = null);
+        helpAlly.enterActions.Add(() => Debug.Log(gameObject.name + " Entering help"));
 
         FSMTransition defendToHelp = new FSMTransition(() => dcc.IsAnyoneSurrounded().Length != 0);
         defendYard.AddTransition(defendToHelp, helpAlly);
         FSMTransition helpToFlee = new FSMTransition(AmISurrounded);
         helpAlly.AddTransition(helpToFlee, flee);
+        FSMTransition helpToDefend = new FSMTransition(() => ! dcc.IsStillSurrounded(allyToHelp));
+        helpAlly.AddTransition(helpToDefend, defendYard);
 
 
         FSMTransition fromDefendToFlee = new FSMTransition(AmISurrounded);
@@ -182,10 +176,17 @@ public class DefenderFSM : MonoBehaviour
         defendWalls.AddTransition(wallsToYard, defendYard);
         defendYard.AddTransition(yardToWalls, defendWalls);
 
-        defendWalls.enterActions.Add(() => Debug.Log("Entering defend walls"));
+        defendWalls.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend walls"));
         fsm = new FSM(defendWalls);
         StartCoroutine(UpdateFSM());
 
+    }
+
+    private IEnumerator OnKilled()
+    {
+        gameObject.SetActive(false);
+        Destroy(gameObject, 1f);
+        return null;
     }
 
     private bool IsFortClear()
@@ -204,7 +205,7 @@ public class DefenderFSM : MonoBehaviour
 
     private void AttackEnemyInsideFort()
     {
-        if (target == null) PickAnEnemy();
+        if (target == null) PickAnEnemyInsideFort();
         if (!TargetIsInRange())
         {
             target = null;
@@ -220,7 +221,7 @@ public class DefenderFSM : MonoBehaviour
         List<GameObject> nearbySurroundedAllies = new List<GameObject>();
         foreach (var ally in surroundedAllies)
         {
-            if (Vector3.Distance(transform.position, ally.transform.position) < attackRange)
+            if (ally != gameObject && Vector3.Distance(transform.position, ally.transform.position) < attackRange)
             {
                 nearbySurroundedAllies.Add(ally);
             }
@@ -281,7 +282,7 @@ public class DefenderFSM : MonoBehaviour
         if (NavMesh.SamplePosition(fleeDestination, out hit, 3f, navMeshAreaMask))
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
-             agent.SetDestination(hit.position);
+            agent.SetDestination(hit.position);
             return;
         }
 
@@ -419,6 +420,21 @@ public class DefenderFSM : MonoBehaviour
         return false;
     }
 
+    private bool PickAnEnemyInsideFort()
+    {
+        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
+        NavMeshHit hit;
+        foreach (var enemy in enemies)
+        {
+            if (enemy.gameObject.CompareTag("Attacker") && NavMesh.SamplePosition(enemy.transform.position, out hit, 0.001f, 1 << NavMesh.GetAreaFromName("Fort")))
+            {
+                target = enemy.gameObject;
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void OnDrawGizmosSelected()
     {
         Color lowAlphaRed = Color.red;
@@ -439,16 +455,16 @@ public class DefenderFSM : MonoBehaviour
         return false;
     }
 
-    private bool LookAtTarget()
-    {
-        transform.LookAt(target.transform);
-        return true;
-    }
 
     private bool AttackTarget()
     {
         if (target == null) return false;
         HealthController hc;
+        if (! IsTargetInSight())
+        {
+            target = null;
+            return false;
+        }
         if (target.TryGetComponent<HealthController>(out hc))
         {
             hc.TakeDamage(attackDamage);

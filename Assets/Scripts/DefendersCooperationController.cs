@@ -70,9 +70,14 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
         List<GameObject> surroundedAllies = new List<GameObject>();
         foreach (var ally in defenders)
         {
-            if (ally.GetComponent<DefenderFSM>().AmISurrounded()) surroundedAllies.Add(ally);
+            if (ally != null && ally.GetComponent<DefenderFSM>().AmISurrounded()) surroundedAllies.Add(ally);
         }
         return surroundedAllies.ToArray();
+    }
+
+    public bool IsStillSurrounded(GameObject ally)
+    {
+        return ally != null ? ally.GetComponent<DefenderFSM>().AmISurrounded() : false;
     }
 
     IEnumerator UpdateStatus()

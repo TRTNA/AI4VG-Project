@@ -63,6 +63,7 @@ public class FSMState {
 	public void Stay() { foreach (FSMAction a in stayActions) a(); }
 	public void Exit() { foreach (FSMAction a in exitActions) a(); }
 
+
 }
 
 public class FSM {

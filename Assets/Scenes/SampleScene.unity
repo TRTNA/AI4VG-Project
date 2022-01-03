@@ -2499,7 +2499,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11de167a8db0f6e45b007f432b72fd4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 16.2
+  attackRange: 25
   attackDamage: 5
   surroundedRange: 5
   surroundedThreshold: 2
@@ -3405,7 +3405,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11de167a8db0f6e45b007f432b72fd4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 16.2
+  attackRange: 25
   attackDamage: 5
   surroundedRange: 5
   surroundedThreshold: 2

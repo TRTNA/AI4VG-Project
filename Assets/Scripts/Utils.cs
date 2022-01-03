@@ -23,6 +23,7 @@ public static class Utils
         int index = -1;
         for (int i = 0; i < objs.Length; i++)
         {
+            if (objs[i] == null) continue;
             float dist = (source - objs[i].transform.position).sqrMagnitude;
             if (dist < minDist)
             {
