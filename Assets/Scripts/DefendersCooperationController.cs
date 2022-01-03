@@ -6,7 +6,7 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
 {
     public float updateRate = 1f;
 
-    public Dictionary<DefensivePosition, GameObject> defensivePositions;
+    public Dictionary<DefensivePosition, GameObject> defensivePositions = new Dictionary<DefensivePosition, GameObject>();
     private GameObject[] defenders;
     public Dictionary<GameObject, bool> hordeStatus;
     public Dictionary<GameObject, GameObject> whoIsHelpingWho;
@@ -14,7 +14,6 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
     // Start is called before the first frame update
     void Start()
     {
-        defensivePositions = new Dictionary<DefensivePosition, GameObject>();
         foreach (var defPosition in GameObject.FindGameObjectsWithTag("DefensivePosition"))
         {
             var dp = defPosition.GetComponent<DefensivePosition>();
@@ -44,7 +43,7 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
         {
             if (item.Value)
             {
-                if (item.Key != otherDef) toHelp.Add(item.Key);
+                if (item.Key != otherDef && item.Key != otherDef) toHelp.Add(item.Key);
             }
         }
         return Utils.GetNearestObject(otherDef.transform.position, toHelp.ToArray());
@@ -110,13 +109,12 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
             List<GameObject> temp = new List<GameObject>();
             foreach (var def in defenders)
             {
-                if (temp != null) temp.Add(def);
+                if (def != null) temp.Add(def);
             }
             defenders = temp.ToArray();
             bool hasHorde = false;
             foreach (var def in defenders)
             {
-                hasHorde = def.GetComponent<DefenderFSM>().HasHorde();
                 hordeStatus[def] = hasHorde;
                 //if has not a horde, nobody has to help it
                 if (! hasHorde)
