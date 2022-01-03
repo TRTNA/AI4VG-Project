@@ -54,7 +54,7 @@ public class DefenderFSM : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         dcc = GameObject.Find("DefendersCooperationController").GetComponent<DefendersCooperationController>();
         navMeshAreaMask = 1<<NavMesh.GetAreaFromName("Fort");
-        GetComponent<HealthController>().SetOnHealthDroppedToZero(() => StartCoroutine(OnKilled()));
+        GetComponent<HealthController>().SetOnHealthDroppedToZero(() => OnKilled());
 
         //horde control bt
         BTAction pickAnEnemy = new BTAction(PickAnEnemy);
@@ -113,13 +113,13 @@ public class DefenderFSM : MonoBehaviour
         FSMState defendWalls = new FSMState();
         defendWalls.stayActions.Add(() => defendWallsBT.Step());
 
-
         BehaviorTree defendYardBT = new BehaviorTree(null);
         
         
         FSMState defendYard = new FSMState();
         defendYard.exitActions.Add(() => { target = null; allyToHelp = null; });
         defendYard.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend yard"));
+        defendYard.enterActions.Add(() => { agent.ResetPath();  });
 
         defendYard.stayActions.Add(AttackEnemyInsideFort);
 
@@ -182,11 +182,10 @@ public class DefenderFSM : MonoBehaviour
 
     }
 
-    private IEnumerator OnKilled()
+    private void OnKilled()
     {
         gameObject.SetActive(false);
         Destroy(gameObject, 1f);
-        return null;
     }
 
     private bool IsFortClear()
@@ -368,14 +367,11 @@ public class DefenderFSM : MonoBehaviour
 
     private bool FindAnEmptyDefensivePosition()
     {
-        GameObject[] sortedDefPos = Utils.SortByDistance(transform.position, defensivePositions);
-        foreach (var defPos in sortedDefPos)
+        GameObject defPos = dcc.ReserveNearestEmptyDefensivePosition(gameObject);
+        if (defPos != null)
         {
-            if (! defPos.GetComponent<DefensivePosition>().IsOccupied())
-            {
-                destination = defPos.transform.position;
-                return true;
-            }
+            destination = defPos.transform.position;
+            return true;
         }
         return false;
     }

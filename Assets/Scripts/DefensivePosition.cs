@@ -3,13 +3,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(BoxCollider))]
-public class DefensivePosition : MonoBehaviour
+public class DefensivePosition : MonoBehaviour, ISubject
 {
-    private GameObject occupiedBy = null;
+    public GameObject occupiedBy = null;
+    private ISet<IObserver> observers;
 
     public void Start()
     {
         GetComponent<BoxCollider>().isTrigger = true;
+        observers = new HashSet<IObserver>();
     }
 
     public bool IsOccupied()
@@ -26,8 +28,8 @@ public class DefensivePosition : MonoBehaviour
     {
         if (other.CompareTag("Defender"))
         {
-            Debug.Log("Exit!");
             occupiedBy = null;
+            Notify();
         }
     }
 
@@ -36,6 +38,7 @@ public class DefensivePosition : MonoBehaviour
         if (occupiedBy != null && other.CompareTag("Defender"))
         {
             occupiedBy = other.gameObject;
+            Notify();
         }
     }
 
@@ -43,7 +46,27 @@ public class DefensivePosition : MonoBehaviour
     {
         if (occupiedBy == null && other.CompareTag("Defender"))
         {
+            
             occupiedBy = other.gameObject;
+            Notify();
         }
+    }
+
+    public void Notify()
+    {
+        foreach (var o in observers)
+        {
+            o.OnNotify(gameObject, occupiedBy != null);
+        }
+    }
+
+    public void AddObserver(IObserver o)
+    {
+        if (o != null) observers.Add(o);
+    }
+
+    public void RemoveObserver(IObserver o)
+    {
+        observers.Remove(o);
     }
 }

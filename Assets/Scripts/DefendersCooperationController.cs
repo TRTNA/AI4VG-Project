@@ -6,15 +6,20 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
 {
     public float updateRate = 1f;
 
-    private GameObject[] defensivePositions;
+    public Dictionary<DefensivePosition, GameObject> defensivePositions;
     private GameObject[] defenders;
-    private Dictionary<GameObject, bool> hordeStatus;
-    private Dictionary<GameObject, GameObject> whoIsHelpingWho;
+    public Dictionary<GameObject, bool> hordeStatus;
+    public Dictionary<GameObject, GameObject> whoIsHelpingWho;
 
     // Start is called before the first frame update
     void Start()
     {
-        defensivePositions = GameObject.FindGameObjectsWithTag("DefensivePosition");
+        defensivePositions = new Dictionary<DefensivePosition, GameObject>();
+        foreach (var defPosition in GameObject.FindGameObjectsWithTag("DefensivePosition"))
+        {
+            var dp = defPosition.GetComponent<DefensivePosition>();
+            defensivePositions.Add(dp, dp.OccupiedBy());
+        }
         defenders = GameObject.FindGameObjectsWithTag("Defender");
         hordeStatus = new Dictionary<GameObject, bool>();
         whoIsHelpingWho = new Dictionary<GameObject, GameObject>();
@@ -23,6 +28,10 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
             hordeStatus.Add(def, false);
             whoIsHelpingWho.Add(def, null);
             def.GetComponent<HealthController>().AddObserver(this);
+        }
+        foreach (var def in defensivePositions.Keys)
+        {
+            def.GetComponent<DefensivePosition>().AddObserver(this);
         }
         StartCoroutine(UpdateStatus());
     }
@@ -80,11 +89,30 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
         return ally != null ? ally.GetComponent<DefenderFSM>().AmISurrounded() : false;
     }
 
+    public GameObject ReserveNearestEmptyDefensivePosition(GameObject defender)
+    {
+        List<GameObject> emptyDefensivePositions = new List<GameObject>();
+        foreach (var item in defensivePositions)
+        {
+            if (item.Value == null) emptyDefensivePositions.Add(item.Key.gameObject);
+        }
+        GameObject nearest = Utils.GetNearestObject(defender.transform.position, emptyDefensivePositions.ToArray());
+        if (nearest == null) return nearest;
+        //reservation only if nearest def position is not null
+        defensivePositions[nearest.GetComponent<DefensivePosition>()] = defender;
+        return nearest;
+    }
+
     IEnumerator UpdateStatus()
     {
         while (true)
         {
-            defenders = GameObject.FindGameObjectsWithTag("Defender");
+            List<GameObject> temp = new List<GameObject>();
+            foreach (var def in defenders)
+            {
+                if (temp != null) temp.Add(def);
+            }
+            defenders = temp.ToArray();
             bool hasHorde = false;
             foreach (var def in defenders)
             {
@@ -103,12 +131,19 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
 
     public void OnNotify(GameObject subject, object status)
     {
+        DefensivePosition defPosition;
+        if (subject.TryGetComponent<DefensivePosition>(out defPosition))
+        {
+            defensivePositions[defPosition] = defPosition.OccupiedBy();
+        }
+        
         if (status.GetType() == typeof(int) && (int)status == 0)
         {
             subject.GetComponent<HealthController>().RemoveObserver(this);
             List<GameObject> temp = new List<GameObject>(defenders);
             temp.Remove(subject);
             defenders = temp.ToArray();
+            return;
         }
     }
 }
