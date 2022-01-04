@@ -115,7 +115,7 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
             bool hasHorde = false;
             foreach (var def in defenders)
             {
-                hordeStatus[def] = hasHorde;
+                hordeStatus[def] = def.GetComponent<DefenderFSM>().HasHorde();
                 //if has not a horde, nobody has to help it
                 if (! hasHorde)
                 {
