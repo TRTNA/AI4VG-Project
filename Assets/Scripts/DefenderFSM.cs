@@ -70,150 +70,187 @@ public class DefenderFSM : MonoBehaviour
 
         GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
 
-        FSMState defendWalls = new FSMState();
+
         BTCondition hasATarget = new BTCondition(HasATarget);
         BTCondition isTargetInSight = new BTCondition(IsTargetInSight);
         BTCondition isTargetInRange = new BTCondition(TargetIsInRange);
-        BTAction attack = new BTAction(AttackTarget2);
+        BTAction attack = new BTAction(AttackTarget);
         BTCondition isTargetAlive = new BTCondition(IsTargetAlive);
 
-        BTAction releaseTarget = new BTAction(ReleaseTarget);
+        BTAction releaseTargetAction = new BTAction(ReleaseTarget);
         BTSequence attackSequence = new BTSequence(new IBTTask[] { hasATarget, isTargetInRange, isTargetInSight, attack, isTargetAlive });
 
-        BTSelector attackOrReleaseTarget = new BTSelector(new IBTTask[] { attackSequence, releaseTarget });
+        BTSelector attackOrReleaseTarget = new BTSelector(new IBTTask[] { attackSequence, releaseTargetAction });
 
         BehaviorTree attackBT = new BehaviorTree(attackOrReleaseTarget);
-        defendWalls.stayActions.Add(PickAnEnemy);
-        defendWalls.stayActions.Add(() => attackBT.Step());
-        defendWalls.stayActions.Add(() => hordeStatus = VerifyHordeStatus());
-        defendWalls.stayActions.Add(() =>
-        {
-            if (HasHorde() == false)
-            {
-                allyIsHelping = false;
-                return;
-            }
 
-            if (allyIsHelping) return;
-            foreach (var defender in Utils.SortByDistance(transform.position, defenders))
-            {
-                if (defender.GetComponent<DefenderFSM>().HasHorde()) continue;
+        FSMAction resetAgentPath = () => agent.ResetPath();
+        FSMAction releaseTarget = () => target = null;
+        FSMAction setAllyToHelpAsDestination = () => destination = allyToHelp != null ? allyToHelp.transform.position : destination;
+        FSMAction attackTarget = () => attackBT.Step();
 
-                allyIsHelping  = defender.GetComponent<DefenderFSM>().AskForHelp(gameObject);
-                if (allyIsHelping) break;
-            }
-        });
-        defendWalls.exitActions.Add(() => { target = null;  agent.ResetPath(); });
+        FSMState attackEnemiesOutsideFortState = new FSMState();
+        attackEnemiesOutsideFortState.stayActions.Add(PickAnEnemy);
+        attackEnemiesOutsideFortState.stayActions.Add(attackTarget);
+        attackEnemiesOutsideFortState.stayActions.Add(UpdateHordeStatus);
+        attackEnemiesOutsideFortState.stayActions.Add(CheckHordeHelp);
 
-        FSMState reenterDefensivePosition = new FSMState();
-        reenterDefensivePosition.enterActions.Add(FindAnEmptyDefensivePosition);
-        reenterDefensivePosition.enterActions.Add(MoveToDestination);
-        reenterDefensivePosition.exitActions.Add(() => { agent.ResetPath(); });
-        reenterDefensivePosition.enterActions.Add(() => Debug.Log(gameObject.name + "Entering def pos reenter"));
+        attackEnemiesOutsideFortState.exitActions.Add(releaseTarget);
+        attackEnemiesOutsideFortState.exitActions.Add(resetAgentPath);
+
+        FSMState goToDefensivePositionState = new FSMState();
+        goToDefensivePositionState.enterActions.Add(() => Debug.Log(gameObject.name + "Entering def pos reenter"));
+        goToDefensivePositionState.enterActions.Add(FindAnEmptyDefensivePosition);
+        goToDefensivePositionState.enterActions.Add(MoveToDestination);
+        goToDefensivePositionState.exitActions.Add(resetAgentPath);
 
 
-        FSMState helpWithHorde = new FSMState();
+        FSMState helpAllyState = new FSMState();
+
+        BTCondition agentIsStill = new BTCondition(() => agent.velocity == Vector3.zero);
+
+        //provare con test sulla velocity
+        BTSequence attackEnemiesWhenArrived = new BTSequence(new IBTTask[]{agentIsStill, attackOrReleaseTarget});
+        BehaviorTree helpWithHordeBT = new BehaviorTree(attackEnemiesWhenArrived);
+
+        FSMAction helpWithHordeAction = () => helpWithHordeBT.Step();
+
+        helpAllyState.enterActions.Add(() => Debug.Log(gameObject.name + "Entering horde help"));
+        helpAllyState.enterActions.Add(setAllyToHelpAsDestination);
+        helpAllyState.enterActions.Add(SetAgentDestination);
+
+        helpAllyState.stayActions.Add(PickAnEnemy);
+        helpAllyState.stayActions.Add(helpWithHordeAction);
+
+        FSMAction resetAllyToHelp = () => allyToHelp = null;
+        helpAllyState.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp ,resetAgentPath};
 
 
-        helpWithHorde.enterActions.Add(() => destination = allyToHelp != null ? allyToHelp.transform.position : Vector3.zero);
-        helpWithHorde.enterActions.Add(() => agent.SetDestination(destination));
-        helpWithHorde.stayActions.Add(() =>
-        {
-            if (! agent.hasPath)
-            {
-                PickAnEnemy();
-                AttackTarget();
-            }
-        });
-        helpWithHorde.exitActions.Add(() => { target = null; allyToHelp = null; agent.ResetPath(); });
-        helpWithHorde.enterActions.Add(() => Debug.Log(gameObject.name + "Entering horde help"));
-        
+        FSMCondition isNotOutsideDefensivePosition = () => !IsOutsideDefensivePosition();
+        FSMCondition hasAnAllyToHelpAndHasNotAHorde = () => allyToHelp != null && HasHorde() == false;
 
-        FSMTransition defendToHelpWithHorde = new FSMTransition(() => allyToHelp != null && HasHorde() == false); 
-        defendWalls.AddTransition(defendToHelpWithHorde, helpWithHorde);
+        FSMTransition defendToHelpWithHorde = new FSMTransition(hasAnAllyToHelpAndHasNotAHorde); 
+        attackEnemiesOutsideFortState.AddTransition(defendToHelpWithHorde, helpAllyState);
 
         FSMTransition helpWithHordeToDefend = new FSMTransition(HasHordeBeenDestroyed);
-        helpWithHorde.AddTransition(helpWithHordeToDefend, defendWalls);
-
+        helpAllyState.AddTransition(helpWithHordeToDefend, attackEnemiesOutsideFortState);
 
         FSMTransition defendWallsToReenterDefPos = new FSMTransition(IsOutsideDefensivePosition);
-        defendWalls.AddTransition(defendWallsToReenterDefPos, reenterDefensivePosition);
+        attackEnemiesOutsideFortState.AddTransition(defendWallsToReenterDefPos, goToDefensivePositionState);
 
-        FSMTransition reenterDefPosToDefendWalls = new FSMTransition(() => !IsOutsideDefensivePosition());
-        reenterDefensivePosition.AddTransition(reenterDefPosToDefendWalls, defendWalls);
+        FSMTransition reenterDefPosToDefendWalls = new FSMTransition(isNotOutsideDefensivePosition);
+        goToDefensivePositionState.AddTransition(reenterDefPosToDefendWalls, attackEnemiesOutsideFortState);
 
         //defend yard states
         
-        
-        FSMState defendYard = new FSMState();
-        defendYard.exitActions.Add(() => { target = null; allyToHelp = null; });
-        defendYard.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend yard"));
-        defendYard.enterActions.Add(() => { agent.ResetPath();  });
+        FSMState attackEnemiesInsideFortState = new FSMState();
+        attackEnemiesInsideFortState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend yard"));
+        attackEnemiesInsideFortState.enterActions.Add(resetAgentPath);
 
-        defendYard.stayActions.Add(AttackEnemyInsideFort);
+        attackEnemiesInsideFortState.stayActions.Add(AttackEnemyInsideFort);
 
-        FSMState flee = new FSMState();
-        flee.enterActions.Add(() => agent.autoBraking = false);
-        flee.enterActions.Add(() => Debug.Log(gameObject.name + " Entering flee"));
+        attackEnemiesInsideFortState.exitActions = new List<FSMAction>(){releaseTarget, resetAllyToHelp};
+
+        FSMState fleeState = new FSMState();
+        fleeState.enterActions.Add(() => agent.autoBraking = false);
+        fleeState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering flee"));
+
+        //NON ATTACCANO QUANDO AIUTANO
+
+        fleeState.stayActions.Add(Flee);
+
+        fleeState.exitActions.Add(() => agent.autoBraking = true);
+
+        BTCall hasAllyToHelp = () => allyToHelp != null;
+
+        BTCondition hasAllyToHelpCondition = new BTCondition(hasAllyToHelp);
 
 
-        flee.stayActions.Add(Flee);
-        flee.exitActions.Add(() => agent.autoBraking = true);
+        BTCall allyIsToFar = () => Vector3.Distance(transform.position, allyToHelp.transform.position) > attackRange;
+        BTAction getCloseToAlly = new BTAction(GetCloseToAlly);
 
-        FSMState helpSurroundedAlly = new FSMState();
-        helpSurroundedAlly.stayActions.Add(() =>
+        BTDecoratorFilter getCloseToAllyIfIsTooFar = new BTDecoratorFilter(allyIsToFar, getCloseToAlly);
+
+        BTSequence helpSurroundedAllySequence = new BTSequence(new IBTTask[]
         {
-            if (allyToHelp == null)
-            {
-                allyToHelp = Utils.GetNearestObject(transform.position, GetNearbySurroundedAllies());
-                if (allyToHelp == null) return;
-            }
-            float distanceToAlly = Vector3.Distance(transform.position, allyToHelp.transform.position);
-            if (distanceToAlly > attackRange)
-            {
-                
-                Vector3 directionTowardAlly = (allyToHelp.transform.position - transform.position).normalized;
-                agent.SetDestination(transform.position + directionTowardAlly * (distanceToAlly - attackRange));
-                return;
-            }
-            target = PickEnemyWhoIsSurroundingAlly();
-            AttackTarget();
-            
-
-
+            hasAllyToHelpCondition,
+            getCloseToAllyIfIsTooFar,
+            new BTAction(PickEnemyWhoIsSurroundingAlly),
+            attackEnemiesWhenArrived
         });
-        helpSurroundedAlly.exitActions.Add(() => allyToHelp = null);
-        helpSurroundedAlly.enterActions.Add(() => Debug.Log(gameObject.name + " Entering help"));
+        BehaviorTree helpSurroundedAllyBT = new BehaviorTree(helpSurroundedAllySequence);
+
+        FSMState helpSurroundedAllyState = new FSMState();
+        helpSurroundedAllyState.enterActions.Add(() => allyToHelp = Utils.GetNearestObject(transform.position, GetSurroundedAllies()));
+        helpSurroundedAllyState.stayActions.Add(() => helpSurroundedAllyBT.Step());
+        helpSurroundedAllyState.exitActions.Add(resetAllyToHelp);
+        helpSurroundedAllyState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering help"));
 
         FSMTransition defendToHelp = new FSMTransition(() => dcc.IsAnyoneSurrounded().Length != 0);
-        defendYard.AddTransition(defendToHelp, helpSurroundedAlly);
+        attackEnemiesInsideFortState.AddTransition(defendToHelp, helpSurroundedAllyState);
         FSMTransition helpToFlee = new FSMTransition(AmISurrounded);
-        helpSurroundedAlly.AddTransition(helpToFlee, flee);
+        helpSurroundedAllyState.AddTransition(helpToFlee, fleeState);
         FSMTransition helpToDefend = new FSMTransition(() => ! dcc.IsStillSurrounded(allyToHelp));
-        helpSurroundedAlly.AddTransition(helpToDefend, defendYard);
+        helpSurroundedAllyState.AddTransition(helpToDefend, attackEnemiesInsideFortState);
 
 
         FSMTransition fromDefendToFlee = new FSMTransition(AmISurrounded);
-        defendYard.AddTransition(fromDefendToFlee, flee);
+        attackEnemiesInsideFortState.AddTransition(fromDefendToFlee, fleeState);
 
         FSMTransition fromFleeToDefend = new FSMTransition(AmIClear);
-        flee.AddTransition(fromFleeToDefend, defendYard);
+        fleeState.AddTransition(fromFleeToDefend, attackEnemiesInsideFortState);
 
         FSMTransition wallsToYard = new FSMTransition(() => !IsFortClear());
         FSMTransition yardToWalls = new FSMTransition(IsFortClear);
 
-        defendWalls.AddTransition(wallsToYard, defendYard);
-        defendYard.AddTransition(yardToWalls, defendWalls);
+        attackEnemiesOutsideFortState.AddTransition(wallsToYard, attackEnemiesInsideFortState);
+        attackEnemiesInsideFortState.AddTransition(yardToWalls, attackEnemiesOutsideFortState);
 
         FSMTransition helpWithHordeToDefendYard = new FSMTransition(() => !IsFortClear());
-        helpWithHorde.AddTransition(helpWithHordeToDefendYard, defendYard);
+        helpAllyState.AddTransition(helpWithHordeToDefendYard, attackEnemiesInsideFortState);
         FSMTransition reenterDefPositionToDefendYard = new FSMTransition(() => !IsFortClear());
-        reenterDefensivePosition.AddTransition(reenterDefPositionToDefendYard, defendYard);
+        goToDefensivePositionState.AddTransition(reenterDefPositionToDefendYard, attackEnemiesInsideFortState);
 
-        defendWalls.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend walls"));
-        fsm = new FSM(defendWalls);
+        attackEnemiesOutsideFortState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend walls"));
+        fsm = new FSM(attackEnemiesOutsideFortState);
         StartCoroutine(UpdateFSM());
 
+    }
+
+    private bool GetCloseToAlly()
+    {
+        if (agent.hasPath) return true;
+        Vector3 directionTowardAlly = (allyToHelp.transform.position - transform.position);
+        Vector3 tempDestination = transform.position + directionTowardAlly / 2;
+        return agent.SetDestination(tempDestination);
+        
+    }
+
+    private void SetAgentDestination()
+    {
+        agent.SetDestination(destination);
+    }
+
+
+
+    private void CheckHordeHelp()
+    {
+        //If it hasn't a horde it doesn't need help
+        if (HasHorde() == false)
+        {
+            allyIsHelping = false;
+            return;
+        }
+
+        //If it has an ally helping it doesn't need help
+        if (allyIsHelping) return;
+        foreach (var defender in Utils.SortByDistance(transform.position, defenders))
+        {
+            if (defender.GetComponent<DefenderFSM>().HasHorde()) continue;
+
+            allyIsHelping = defender.GetComponent<DefenderFSM>().AskForHelp(gameObject);
+            if (allyIsHelping) break;
+        }
     }
 
     private bool ReleaseTarget()
@@ -262,22 +299,12 @@ public class DefenderFSM : MonoBehaviour
         if (target.GetComponent<HealthController>().Health == 0) target = null;
     }
 
-    private GameObject[] GetNearbySurroundedAllies()
+    private GameObject[] GetSurroundedAllies()
     {
-        GameObject[] surroundedAllies = dcc.IsAnyoneSurrounded();
-        List<GameObject> nearbySurroundedAllies = new List<GameObject>();
-        foreach (var ally in surroundedAllies)
-        {
-            if (ally != gameObject && Vector3.Distance(transform.position, ally.transform.position) < attackRange)
-            {
-                nearbySurroundedAllies.Add(ally);
-            }
-        }
-        return nearbySurroundedAllies.ToArray();
-
+        return dcc.IsAnyoneSurrounded();
     }
 
-    private GameObject PickEnemyWhoIsSurroundingAlly()
+    private bool PickEnemyWhoIsSurroundingAlly()
     {
         Collider[] colls = Physics.OverlapSphere(allyToHelp.transform.position, surroundedRange);
         List<GameObject> enemies = new List<GameObject>();
@@ -285,8 +312,10 @@ public class DefenderFSM : MonoBehaviour
         {
             if (coll.gameObject.CompareTag("Attacker")) enemies.Add(coll.gameObject);
         }
-        if (enemies.Count == 0) return null;
-        return enemies[0];
+
+        if (enemies.Count == 0) return false;
+        target = enemies[0];
+        return true;
     }
 
     private bool TargetIsInRange()
@@ -453,7 +482,7 @@ public class DefenderFSM : MonoBehaviour
         return Vector3.Distance(transform.position, destination) > arrivingRange;
     }
 
-    private bool VerifyHordeStatus()
+    private void UpdateHordeStatus()
     {
         Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
         int count = 0;
@@ -461,7 +490,8 @@ public class DefenderFSM : MonoBehaviour
         {
             if (enemy.gameObject.CompareTag("Attacker")) count++;
         }
-        return count > hordeLimit;
+
+        hordeStatus = count > hordeLimit;
     }
 
     public bool HasHorde() { return hordeStatus; }
@@ -518,7 +548,7 @@ public class DefenderFSM : MonoBehaviour
     
 
 
-    private void AttackTarget()
+    private void NotUseThis()
     {
         if (target == null) return;
 
@@ -542,11 +572,11 @@ public class DefenderFSM : MonoBehaviour
         target = null;
     }
 
-    private bool AttackTarget2()
+    private bool AttackTarget()
     {
         HealthController hc;
         if (!target.TryGetComponent<HealthController>(out hc)) return false;
-
+        Debug.Log(gameObject.name + " attacking" + target.name);
         hc.TakeDamage(attackDamage);
         Debug.DrawLine(transform.position, target.transform.position, Color.red, 0.5f);
         return true;
@@ -556,7 +586,7 @@ public class DefenderFSM : MonoBehaviour
     {
         BTCondition hasATarget = new BTCondition(HasATarget);
         BTCondition isTargetInSight = new BTCondition(IsTargetInSight);
-        BTAction attack = new BTAction(AttackTarget2);
+        BTAction attack = new BTAction(AttackTarget);
         BTCondition isTargetAlive = new BTCondition(IsTargetAlive);
 
         BTSequence attackSequence = new BTSequence(new IBTTask[] {hasATarget, isTargetInSight, attack, isTargetAlive});
