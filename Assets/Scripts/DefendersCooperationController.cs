@@ -35,43 +35,6 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
         StartCoroutine(UpdateStatus());
     }
 
-    //returns a defender if otherDef has to help, otherwise it returns null
-    public GameObject DoesItNeedHelpWithHorde(GameObject otherDef)
-    {
-        List<GameObject> toHelp = new List<GameObject>();
-        foreach (var item in hordeStatus)
-        {
-            if (item.Value)
-            {
-                if (item.Key != otherDef && item.Key != otherDef) toHelp.Add(item.Key);
-            }
-        }
-        return Utils.GetNearestObject(otherDef.transform.position, toHelp.ToArray());
-    }
-
-    public bool HelpDefenderWithHorde(GameObject helper, GameObject helpee)
-    {
-        if (whoIsHelpingWho[helpee] == null)
-        {
-            whoIsHelpingWho[helpee] = helper;
-            return true;
-        }
-        GameObject otherHelper = whoIsHelpingWho[helpee];
-        //if otherHelper is closer to helpee then let it help, otherwise new helper will help
-        if ((otherHelper.transform.position - helpee.transform.position).sqrMagnitude < (helper.transform.position - helpee.transform.position).sqrMagnitude)
-        {
-            return false;
-        } else
-        {
-            whoIsHelpingWho[helpee] = helper;
-            return true;
-        }
-    }
-
-    public bool DoesItStillNeedHelpWithHorde(GameObject helper, GameObject helpee)
-    {
-        return whoIsHelpingWho[helpee] == helper;
-    }
 
     public GameObject[] IsAnyoneSurrounded()
     {

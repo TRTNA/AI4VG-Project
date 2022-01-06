@@ -61,9 +61,10 @@ public class AttackerFSM : MonoBehaviour, IObserver
         breaching.stayActions.Add(() => breachingDT.walk());
         #endregion
 
+        //todo rimuovere stato wandering e lasciare stato attacking con DT per comportamento (attacco se sono vicino altrimenti mi avvicino)
         #region STATE: wandering
         FSMState wandering = new FSMState();
-        wandering.enterActions.Add(() => SetAgentWanderingParams());
+        wandering.enterActions.Add(SetAgentWanderingParams);
         wandering.stayActions.Add(Wander);
         wandering.stayActions.Add(LookForAnEnemy);
         wandering.exitActions.Add(() => agent.autoBraking = true);
@@ -94,10 +95,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
     #region METHODS: decision tree creation
     private DecisionTree CreateBreachingDecisionTree()
     {
-        DTDecision isGateWithinInteractionRange = new DTDecision((bundle) =>
-        {
-            return IsObjectWithinInteractionRange(nearestGate);
-        });
+        DTDecision isGateWithinInteractionRange = new DTDecision((bundle) => IsObjectWithinInteractionRange(nearestGate));
 
         DTAction walkingToGateAction = new DTAction(WalkToDestination);
 
@@ -121,10 +119,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
     private DecisionTree CreateAttackingDecisionTree()
     {
-        DTDecision isTargetWithinInteractionRange = new DTDecision((bundle) =>
-        {
-            return IsObjectWithinInteractionRange(target);
-        });
+        DTDecision isTargetWithinInteractionRange = new DTDecision((bundle) => IsObjectWithinInteractionRange(target));
         DTAction seekTarget = new DTAction((bundle) =>
         {
             if (target != null)
@@ -165,7 +160,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
     #region METHODS: movement actions
     private void RunToDestination()
     {
-        agent.speed = runSpeed;
+        agent.speed = walkSpeed;
         anim.Play("Base Layer.Run");
         agent.SetDestination(destination);
     }
@@ -232,8 +227,8 @@ public class AttackerFSM : MonoBehaviour, IObserver
     #region METHODS: attacking actions
     private void LookForAnEnemy()
     {
-        Vector3 transformPos = transform.position;
         GameObject[] enemies = GameObject.FindGameObjectsWithTag("Defender");
+        //todo togliere shuffle
         Utils.Shuffle(ref enemies);
         foreach (GameObject enemy in enemies)
         {
@@ -286,7 +281,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
     private bool IsObjectWithinInteractionRange(GameObject obj)
     {
-        return obj != null ? Vector3.Distance(transform.position, obj.transform.position) < interactionRange : false;
+        return obj != null && Vector3.Distance(transform.position, obj.transform.position) < interactionRange;
     }
 
 
@@ -333,13 +328,5 @@ public class AttackerFSM : MonoBehaviour, IObserver
         Destroy(gameObject);
     }
 
-    /*private void FindAnAlly()
-    {
-        GameObject[] allies = GameObject.FindGameObjectsWithTag("Attacker");
-        if (allies.Length == 0) return;
-        RaycastHit hit;
-        allies = allies.Where(ally => Physics.Raycast(transform.position, ally.transform.position, out hit, 1000)).ToArray();
-        hordeReference = allies.OrderBy(ally => Vector3.Distance(gameObject.transform.position, ally.transform.position)).ElementAt(0);
-    }*/
 
 }

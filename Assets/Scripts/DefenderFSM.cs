@@ -29,34 +29,29 @@ public class DefenderFSM : MonoBehaviour
 
     public int hordeLimit = 1;
 
-    //to privatize
-    public GameObject target;
-    public Vector3 destination;
-    public bool onDefensivePosition = true;
-    public float arrivingRange = 1f;
-    public GameObject allyToHelp;
+    
 
     public GameObject[] enemiesSurrounding;
 
 
-    public GameObject projectile;
 
 
     private int navMeshAreaMask;
     private FSM fsm;
-    private GameObject[] defensivePositions;
     private NavMeshAgent agent;
     private DefendersCooperationController dcc;
-    private GameObject fort;
 
     private GameObject[] defenders;
     private bool hordeStatus;
     private bool allyIsHelping;
+    private GameObject target;
+    private Vector3 destination;
+    private bool onDefensivePosition = true;
+    private GameObject allyToHelp;
 
     // Start is called before the first frame update
     void Start()
     {
-        defensivePositions = GameObject.FindGameObjectsWithTag("DefensivePosition");
         agent = GetComponent<NavMeshAgent>();
         dcc = GameObject.Find("DefendersCooperationController").GetComponent<DefendersCooperationController>();
         navMeshAreaMask = 1<<NavMesh.GetAreaFromName("Fort");
@@ -118,7 +113,7 @@ public class DefenderFSM : MonoBehaviour
         FSMAction attackTarget = () => attackDT.walk();
 
         FSMState attackEnemiesOutsideFortState = new FSMState();
-        attackEnemiesOutsideFortState.stayActions = new List<FSMAction> { PickAnEnemy, attackTarget, UpdateHordeStatus, CheckHordeHelp };
+        attackEnemiesOutsideFortState.stayActions = new List<FSMAction> { PickAnEnemy, attackTarget, UpdateHordeStatus, SeekHelpFromAllies };
         attackEnemiesOutsideFortState.exitActions = new List<FSMAction> { releaseTarget, resetAgentPath };
 
         FSMState goToDefensivePositionState = new FSMState();
@@ -228,80 +223,67 @@ public class DefenderFSM : MonoBehaviour
     }
 
 
-    private bool GetCloseToAlly()
-    {
-        if (agent.hasPath) return true;
-        Vector3 directionTowardAlly = (allyToHelp.transform.position - transform.position);
-        Vector3 tempDestination = transform.position + directionTowardAlly / 2;
-        return agent.SetDestination(tempDestination);
-        
-    }
+
+
+    #region Moving method
 
     private void SetAgentDestination()
     {
         agent.SetDestination(destination);
     }
 
-
-
-    private void CheckHordeHelp()
+    private bool IsOutsideDefensivePosition()
     {
-        //If it hasn't a horde it doesn't need help
-        if (HasHorde() == false)
-        {
-            allyIsHelping = false;
-            return;
-        }
+        return !onDefensivePosition;
+    }
 
-        //If it has an ally helping it doesn't need help
-        if (allyIsHelping) return;
-        foreach (var defender in Utils.SortByDistance(transform.position, defenders))
+    private void FindAnEmptyDefensivePosition()
+    {
+        GameObject defPos = dcc.ReserveNearestEmptyDefensivePosition(gameObject);
+        if (defPos != null)
         {
-            if (defender.GetComponent<DefenderFSM>().HasHorde()) continue;
-
-            allyIsHelping = defender.GetComponent<DefenderFSM>().AskForHelp(gameObject);
-            if (allyIsHelping) break;
+            destination = defPos.transform.position;
         }
     }
 
-    private bool ReleaseTarget()
+    private void MoveToDestination()
     {
-        target = null;
-        return true;
-    }
-
-    private bool AskForHelp(GameObject toHelp)
-    {
-        if (allyToHelp != null || HasHorde()) return false;
-        
-        allyToHelp = toHelp;
-        return true;
-    }
-
-    private void OnKilled()
-    {
-        gameObject.SetActive(false);
-        Destroy(gameObject, 1f);
-    }
-
-    private bool IsFortClear()
-    {
-        GameObject[] attackers = GameObject.FindGameObjectsWithTag("Attacker");
-        NavMeshHit hit;
-        foreach (var attacker in attackers)
+        if (!agent.hasPath)
         {
-            if (NavMesh.SamplePosition(attacker.transform.position,out hit, 0.01f, 1<<NavMesh.GetAreaFromName("Fort")))
+            agent.SetDestination(destination);
+        }
+    }
+
+    #endregion
+
+    #region Target selection method
+
+    private void PickAnEnemy()
+    {
+        if (target != null) return;
+        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
+        foreach (var enemy in enemies)
+        {
+            if (enemy.gameObject.CompareTag("Attacker"))
             {
-                return false;
+                target = enemy.gameObject;
             }
         }
-        return true;
     }
 
-
-    private GameObject[] GetSurroundedAllies()
+    private bool PickAnEnemyInsideFort()
     {
-        return dcc.IsAnyoneSurrounded();
+        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
+        NavMeshHit hit;
+        foreach (var enemy in enemies)
+        {
+            if (enemy.gameObject.CompareTag("Attacker") && NavMesh.SamplePosition(enemy.transform.position, out hit, 0.001f, 1 << NavMesh.GetAreaFromName("Fort")))
+            {
+                target = enemy.gameObject;
+                return true;
+            }
+        }
+        return false;
     }
 
     private bool PickEnemyWhoIsSurroundingAlly()
@@ -318,12 +300,135 @@ public class DefenderFSM : MonoBehaviour
         return true;
     }
 
+    #endregion
+
+    #region Target status method
+
+    private bool HasATarget()
+    {
+        return target != null;
+    }
+
     private bool TargetIsInRange()
     {
         if (target != null) return Vector3.Distance(target.transform.position, transform.position) < attackRange;
         return false;
     }
 
+    private bool IsTargetInSight()
+    {
+        if (target == null) return false;
+        RaycastHit hit;
+        return Physics.Linecast(transform.position, target.transform.position, out hit) && hit.collider.gameObject.CompareTag("Attacker");
+    }
+
+    private bool IsTargetAlive()
+    {
+        if (target == null) return true;
+        return target.TryGetComponent<HealthController>(out var hc) && hc.Health != 0;
+    }
+
+    private bool AttackTarget()
+    {
+        HealthController hc;
+        if (target == null) return true;
+        if (!target.TryGetComponent<HealthController>(out hc)) return false;
+        Debug.Log(gameObject.name + " attacking" + target.name);
+        hc.TakeDamage(attackDamage);
+        Debug.DrawLine(transform.position, target.transform.position, Color.red, 0.5f);
+        return true;
+    }
+
+    private bool ReleaseTarget()
+    {
+        target = null;
+        return true;
+    }
+
+    #endregion
+
+
+    #region Horde method
+
+    private void UpdateHordeStatus()
+    {
+        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
+        int count = 0;
+        foreach (var enemy in enemies)
+        {
+            if (enemy.gameObject.CompareTag("Attacker")) count++;
+        }
+
+        hordeStatus = count > hordeLimit;
+    }
+
+    public bool HasHorde() { return hordeStatus; }
+
+    private bool HasHordeBeenDestroyed()
+    {
+        return !allyToHelp.GetComponent<DefenderFSM>().HasHorde();
+    }
+
+
+    private void SeekHelpFromAllies()
+    {
+        //If it hasn't a horde it doesn't need help
+        if (HasHorde() == false)
+        {
+            allyIsHelping = false;
+            return;
+        }
+
+        //If it has an ally helping it doesn't need help
+        if (allyIsHelping) return;
+        foreach (var defender in Utils.SortByDistance(transform.position, defenders))
+        {
+            if (defender.GetComponent<DefenderFSM>().HasHorde()) continue;
+
+            allyIsHelping = defender.GetComponent<DefenderFSM>().CanHelpAllyWithHorde(gameObject);
+            if (allyIsHelping) break;
+        }
+    }
+
+
+    private bool CanHelpAllyWithHorde(GameObject ally)
+    {
+        //if i'm already helping or i've an horde i can't help ally
+        if (allyToHelp != null || HasHorde()) return false;
+
+        allyToHelp = ally;
+        return true;
+    }
+
+    #endregion
+
+    #region Help surrounded allies method
+
+    private bool GetCloseToAlly()
+    {
+        if (agent.hasPath) return true;
+        Vector3 directionTowardAlly = (allyToHelp.transform.position - transform.position);
+        Vector3 tempDestination = transform.position + directionTowardAlly / 2;
+        return agent.SetDestination(tempDestination);
+
+    }
+
+
+    private GameObject[] GetSurroundedAllies()
+    {
+        var surroundedAllies = new List<GameObject>();
+        foreach (var ally in defenders)
+        {
+            if (ally != null && ally.GetComponent<DefenderFSM>().AmISurrounded()) surroundedAllies.Add(ally);
+        }
+        return surroundedAllies.ToArray();
+    }
+
+    #endregion
+
+    #region Surrounded method
+
+    //TODO refactor this
     private void Flee()
     {
         Collider[] objectsAround = Physics.OverlapSphere(transform.position, surroundedRange);
@@ -374,11 +479,11 @@ public class DefenderFSM : MonoBehaviour
 
         Vector3 right = transform.position + Quaternion.Euler(0, 90, 0) * fleeDirection * fleeDistance;
 
-        if (NavMesh.SamplePosition(right, out hit, 5f ,navMeshAreaMask))
+        if (NavMesh.SamplePosition(right, out hit, 5f, navMeshAreaMask))
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
 
-             agent.SetDestination(hit.position);
+            agent.SetDestination(hit.position);
             return;
         }
 
@@ -404,11 +509,9 @@ public class DefenderFSM : MonoBehaviour
         int count = 0;
         foreach (var coll in objectsAround)
         {
-            if (coll.gameObject.CompareTag("Attacker"))
-            {
-                enemies.Add(coll.gameObject);
-                count++;
-            }
+            if (!coll.gameObject.CompareTag("Attacker")) continue;
+            enemies.Add(coll.gameObject);
+            count++;
         }
         enemiesSurrounding = enemies.ToArray();
         return count >= surroundedThreshold;
@@ -416,125 +519,26 @@ public class DefenderFSM : MonoBehaviour
 
     public bool AmIClear()
     {
-        return ! AmISurrounded() && Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f;
+        return !AmISurrounded() && Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f;
     }
 
+    #endregion
 
-    private bool HasHordeBeenDestroyed()
+
+
+
+    private bool IsFortClear()
     {
-        return ! allyToHelp.GetComponent<DefenderFSM>().HasHorde();
-    }
-
-    private bool IsOutsideDefensivePosition()
-    {
-        return ! onDefensivePosition;
-    }
-
-    private void FindAnEmptyDefensivePosition()
-    {
-        GameObject defPos = dcc.ReserveNearestEmptyDefensivePosition(gameObject);
-        if (defPos != null)
-        {
-            destination = defPos.transform.position;
-        }
-    }
-
-    private void MoveToDestination()
-    {
-        if (! agent.hasPath)
-        {
-            agent.SetDestination(destination);
-        }
-    }
-
-
-    private void UpdateHordeStatus()
-    {
-        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
-        int count = 0;
-        foreach (var enemy in enemies)
-        {
-            if (enemy.gameObject.CompareTag("Attacker")) count++;
-        }
-
-        hordeStatus = count > hordeLimit;
-    }
-
-    public bool HasHorde() { return hordeStatus; }
-    
-
-    private void PickAnEnemy()
-    {
-        if (target != null) return;
-        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
-        foreach (var enemy in enemies)
-        {
-            if (enemy.gameObject.CompareTag("Attacker"))
-            {
-                target = enemy.gameObject;
-            }
-        }
-    }
-
-    private bool PickAnEnemyInsideFort()
-    {
-        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
+        GameObject[] attackers = GameObject.FindGameObjectsWithTag("Attacker");
         NavMeshHit hit;
-        foreach (var enemy in enemies)
+        foreach (var attacker in attackers)
         {
-            if (enemy.gameObject.CompareTag("Attacker") && NavMesh.SamplePosition(enemy.transform.position, out hit, 0.001f, 1 << NavMesh.GetAreaFromName("Fort")))
+            if (NavMesh.SamplePosition(attacker.transform.position, out hit, 0.01f, 1 << NavMesh.GetAreaFromName("Fort")))
             {
-                target = enemy.gameObject;
-                return true;
+                return false;
             }
         }
-        return false;
-    }
-
-    public void OnDrawGizmosSelected()
-    {
-        Color lowAlphaRed = Color.red;
-        lowAlphaRed.a = 0.1f;
-        Gizmos.color = lowAlphaRed;
-        Gizmos.DrawSphere(transform.position, attackRange);
-        if (target != null) Gizmos.DrawLine(transform.position, target.transform.position);
-    }
-
-    private bool IsTargetInSight()
-    {
-        if (target == null) return false;
-        RaycastHit hit;
-        if (Physics.Linecast(transform.position, target.transform.position, out hit))
-        {
-            return hit.collider.gameObject.CompareTag("Attacker");
-        }
-        return false;
-    }
-
-    
-    private bool AttackTarget()
-    {
-        HealthController hc;
-        if (target == null) return true;
-        if (!target.TryGetComponent<HealthController>(out hc)) return false;
-        Debug.Log(gameObject.name + " attacking" + target.name);
-        hc.TakeDamage(attackDamage);
-        Debug.DrawLine(transform.position, target.transform.position, Color.red, 0.5f);
         return true;
-    }
-
-
-    private bool IsTargetAlive()
-    {
-        if (target == null) return true;
-        if (!target.TryGetComponent<HealthController>(out var hc)) return false;
-
-        return hc.Health != 0;
-    }
-
-    private bool HasATarget()
-    {
-        return target != null;
     }
 
     IEnumerator UpdateFSM()
@@ -566,6 +570,13 @@ public class DefenderFSM : MonoBehaviour
         }
     }
 
+
+    private void OnKilled()
+    {
+        gameObject.SetActive(false);
+        Destroy(gameObject, 1f);
+    }
+
     private void FixedUpdate()
     {
         if (target != null)
@@ -574,6 +585,16 @@ public class DefenderFSM : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
         
+    }
+
+
+    public void OnDrawGizmosSelected()
+    {
+        Color lowAlphaRed = Color.red;
+        lowAlphaRed.a = 0.1f;
+        Gizmos.color = lowAlphaRed;
+        Gizmos.DrawSphere(transform.position, attackRange);
+        if (target != null) Gizmos.DrawLine(transform.position, target.transform.position);
     }
 
 
