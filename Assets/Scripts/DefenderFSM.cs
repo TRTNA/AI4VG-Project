@@ -71,11 +71,11 @@ public class DefenderFSM : MonoBehaviour
 
         GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
 
-        DTDecision hasATargetD = new DTDecision((b) => HasATarget());
-        DTDecision hasATargetInsideFortD = new DTDecision((b) => HasATarget());
-
+        #region DT for attacking (generic and inside fort)
+        DTDecision hasATarget = new DTDecision((b) => HasATarget());
+        DTDecision hasATargetInsideFort = new DTDecision((b) => HasATarget());
         DTAction acquireTarget = new DTAction((b) =>
-        { 
+        {
             PickAnEnemy();
             return null;
         });
@@ -85,81 +85,65 @@ public class DefenderFSM : MonoBehaviour
             return null;
         });
         DTDecision isInRange = new DTDecision((b) => TargetIsInRange());
-        DTAction releaseTargetD = new DTAction((b) => ReleaseTarget());
-        DTDecision isTargetInSightD = new DTDecision((b) => IsTargetInSight());
-        DTDecision isTargetAliveD = new DTDecision((b) => IsTargetAlive());
-        DTAction attackD = new DTAction((b) => AttackTarget());
+        DTAction releaseTargetDTAction = new DTAction((b) => ReleaseTarget());
+        DTDecision isTargetInsSight = new DTDecision((b) => IsTargetInSight());
+        DTDecision isTargetAlive = new DTDecision((b) => IsTargetAlive());
+        DTAction attack = new DTAction((b) => AttackTarget());
 
         //to attack outside fort
-        hasATargetD.AddLink(false, acquireTarget);
-        hasATargetD.AddLink(true, isInRange);
+        hasATarget.AddLink(false, acquireTarget);
+        hasATarget.AddLink(true, isInRange);
         //to attack inside fort
-        hasATargetInsideFortD.AddLink(true, isInRange);
-        hasATargetInsideFortD.AddLink(false, acquireTargetInsideFort);
+        hasATargetInsideFort.AddLink(true, isInRange);
+        hasATargetInsideFort.AddLink(false, acquireTargetInsideFort);
 
-        isInRange.AddLink(false, releaseTargetD);
-        isInRange.AddLink(true, isTargetInSightD);
+        isInRange.AddLink(false, releaseTargetDTAction);
+        isInRange.AddLink(true, isTargetInsSight);
 
-        isTargetInSightD.AddLink(false, releaseTargetD);
-        isTargetInSightD.AddLink(true, isTargetAliveD);
+        isTargetInsSight.AddLink(false, releaseTargetDTAction);
+        isTargetInsSight.AddLink(true, isTargetAlive);
 
-        isTargetAliveD.AddLink(false, releaseTargetD);
-        isTargetAliveD.AddLink(true, attackD);
+        isTargetAlive.AddLink(false, releaseTargetDTAction);
+        isTargetAlive.AddLink(true, attack);
 
-        DecisionTree attackDT = new DecisionTree(hasATargetD);
-        DecisionTree attackInsideFortDT = new DecisionTree(hasATargetInsideFortD);
+        DecisionTree attackDT = new DecisionTree(hasATarget);
+        DecisionTree attackInsideFortDT = new DecisionTree(hasATargetInsideFort);
+        #endregion
 
-       
 
+        #region Defend fort walls states
         FSMAction resetAgentPath = () => agent.ResetPath();
         FSMAction releaseTarget = () => target = null;
         FSMAction setAllyToHelpAsDestination = () => destination = allyToHelp != null ? allyToHelp.transform.position : destination;
         FSMAction attackTarget = () => attackDT.walk();
 
         FSMState attackEnemiesOutsideFortState = new FSMState();
-        attackEnemiesOutsideFortState.stayActions.Add(PickAnEnemy);
-        attackEnemiesOutsideFortState.stayActions.Add(attackTarget);
-        attackEnemiesOutsideFortState.stayActions.Add(UpdateHordeStatus);
-        attackEnemiesOutsideFortState.stayActions.Add(CheckHordeHelp);
-
-        attackEnemiesOutsideFortState.exitActions.Add(releaseTarget);
-        attackEnemiesOutsideFortState.exitActions.Add(resetAgentPath);
+        attackEnemiesOutsideFortState.stayActions = new List<FSMAction> { PickAnEnemy, attackTarget, UpdateHordeStatus, CheckHordeHelp };
+        attackEnemiesOutsideFortState.exitActions = new List<FSMAction> { releaseTarget, resetAgentPath };
 
         FSMState goToDefensivePositionState = new FSMState();
-        goToDefensivePositionState.enterActions.Add(() => Debug.Log(gameObject.name + "Entering def pos reenter"));
-        goToDefensivePositionState.enterActions.Add(FindAnEmptyDefensivePosition);
-        goToDefensivePositionState.enterActions.Add(MoveToDestination);
+        goToDefensivePositionState.enterActions = new List<FSMAction> { FindAnEmptyDefensivePosition, MoveToDestination };
         goToDefensivePositionState.exitActions.Add(resetAgentPath);
 
 
         FSMState helpAllyState = new FSMState();
 
-
-        //provare con test sulla velocity
-
         DTDecision hasArrivedD = new DTDecision((b) => Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f);
-        hasArrivedD.AddLink(true, hasATargetInsideFortD);
-
+        hasArrivedD.AddLink(true, hasATargetInsideFort);
         DecisionTree helpWithHordeDT = new DecisionTree(hasArrivedD);
-
-
         FSMAction helpWithHordeAction = () => helpWithHordeDT.walk();
-
-        helpAllyState.enterActions.Add(() => Debug.Log(gameObject.name + "Entering horde help"));
-        helpAllyState.enterActions.Add(setAllyToHelpAsDestination);
-        helpAllyState.enterActions.Add(SetAgentDestination);
-
-        helpAllyState.stayActions.Add(PickAnEnemy);
-        helpAllyState.stayActions.Add(helpWithHordeAction);
-
         FSMAction resetAllyToHelp = () => allyToHelp = null;
-        helpAllyState.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp ,resetAgentPath};
+
+        helpAllyState.enterActions = new List<FSMAction>(2) { setAllyToHelpAsDestination, SetAgentDestination };
+        helpAllyState.stayActions = new List<FSMAction>(2) { PickAnEnemy, helpWithHordeAction };
+        helpAllyState.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp, resetAgentPath };
 
 
         FSMCondition isNotOutsideDefensivePosition = () => !IsOutsideDefensivePosition();
         FSMCondition hasAnAllyToHelpAndHasNotAHorde = () => allyToHelp != null && HasHorde() == false;
 
-        FSMTransition defendToHelpWithHorde = new FSMTransition(hasAnAllyToHelpAndHasNotAHorde); 
+
+        FSMTransition defendToHelpWithHorde = new FSMTransition(hasAnAllyToHelpAndHasNotAHorde);
         attackEnemiesOutsideFortState.AddTransition(defendToHelpWithHorde, helpAllyState);
 
         FSMTransition helpWithHordeToDefend = new FSMTransition(HasHordeBeenDestroyed);
@@ -171,27 +155,21 @@ public class DefenderFSM : MonoBehaviour
         FSMTransition reenterDefPosToDefendWalls = new FSMTransition(isNotOutsideDefensivePosition);
         goToDefensivePositionState.AddTransition(reenterDefPosToDefendWalls, attackEnemiesOutsideFortState);
 
-        //defend yard states
-        
+        #endregion
+
+        #region Defend fort yard states
         FSMState attackEnemiesInsideFortState = new FSMState();
-        attackEnemiesInsideFortState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend yard"));
         attackEnemiesInsideFortState.enterActions.Add(resetAgentPath);
-
         attackEnemiesInsideFortState.stayActions.Add(() => attackInsideFortDT.walk());
-
-        attackEnemiesInsideFortState.exitActions = new List<FSMAction>(){releaseTarget, resetAllyToHelp};
+        attackEnemiesInsideFortState.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp };
 
         FSMState fleeState = new FSMState();
-        
         fleeState.enterActions.Add(() => agent.autoBraking = false);
-        fleeState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering flee"));
-
-        //TODO sistemare flee, escono da flee quando sono liberi non quando si sono allontanato abbastanza
         fleeState.stayActions.Add(Flee);
-
         fleeState.exitActions.Add(() => agent.autoBraking = true);
 
 
+        #region Help surrounded ally DT
         DTDecision hasAllyToHelpD = new DTDecision((b) => allyToHelp != null);
         DTDecision isAllyToHelpTooFarD = new DTDecision((b) =>
             Vector3.Distance(transform.position, allyToHelp.transform.position) > attackRange);
@@ -209,42 +187,46 @@ public class DefenderFSM : MonoBehaviour
 
         DecisionTree helpSurroundedAllyDT = new DecisionTree(hasAllyToHelpD);
 
+        #endregion
         FSMState helpSurroundedAllyState = new FSMState();
         helpSurroundedAllyState.enterActions.Add(() => allyToHelp = Utils.GetNearestObject(transform.position, GetSurroundedAllies()));
         helpSurroundedAllyState.stayActions.Add(() => helpSurroundedAllyDT.walk());
         helpSurroundedAllyState.exitActions.Add(resetAllyToHelp);
-        helpSurroundedAllyState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering help"));
 
-        FSMTransition defendToHelp = new FSMTransition(() => dcc.IsAnyoneSurrounded().Length != 0 && ! AmISurrounded());
+        FSMTransition defendToHelp = new FSMTransition(() => dcc.IsAnyoneSurrounded().Length != 0 && !AmISurrounded());
         attackEnemiesInsideFortState.AddTransition(defendToHelp, helpSurroundedAllyState);
         FSMTransition helpToFlee = new FSMTransition(AmISurrounded);
         helpSurroundedAllyState.AddTransition(helpToFlee, fleeState);
-        FSMTransition helpToDefend = new FSMTransition(() => ! dcc.IsStillSurrounded(allyToHelp));
+        FSMTransition helpToDefend = new FSMTransition(() => !dcc.IsStillSurrounded(allyToHelp));
         helpSurroundedAllyState.AddTransition(helpToDefend, attackEnemiesInsideFortState);
-
 
         FSMTransition fromDefendToFlee = new FSMTransition(AmISurrounded);
         attackEnemiesInsideFortState.AddTransition(fromDefendToFlee, fleeState);
 
         FSMTransition fromFleeToDefend = new FSMTransition(AmIClear);
-        fleeState.AddTransition(fromFleeToDefend, attackEnemiesInsideFortState);
+        fleeState.AddTransition(fromFleeToDefend, attackEnemiesInsideFortState); 
+        #endregion
 
-        FSMTransition wallsToYard = new FSMTransition(() => !IsFortClear());
+        FSMCondition isFortInvaded = new FSMCondition(() => !IsFortClear());
+
+        FSMTransition wallsToYard = new FSMTransition(isFortInvaded);
         FSMTransition yardToWalls = new FSMTransition(IsFortClear);
 
         attackEnemiesOutsideFortState.AddTransition(wallsToYard, attackEnemiesInsideFortState);
         attackEnemiesInsideFortState.AddTransition(yardToWalls, attackEnemiesOutsideFortState);
 
-        FSMTransition helpWithHordeToDefendYard = new FSMTransition(() => !IsFortClear());
+        FSMTransition helpWithHordeToDefendYard = new FSMTransition(isFortInvaded);
         helpAllyState.AddTransition(helpWithHordeToDefendYard, attackEnemiesInsideFortState);
-        FSMTransition reenterDefPositionToDefendYard = new FSMTransition(() => !IsFortClear());
+
+        FSMTransition reenterDefPositionToDefendYard = new FSMTransition(isFortInvaded);
         goToDefensivePositionState.AddTransition(reenterDefPositionToDefendYard, attackEnemiesInsideFortState);
 
-        attackEnemiesOutsideFortState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend walls"));
         fsm = new FSM(attackEnemiesOutsideFortState);
+
         StartCoroutine(UpdateFSM());
 
     }
+
 
     private bool GetCloseToAlly()
     {
