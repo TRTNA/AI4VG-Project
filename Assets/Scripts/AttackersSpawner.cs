@@ -17,10 +17,11 @@ public class AttackersSpawner : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        RaycastHit hit;
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        
         if (canSpawn && unitsAvailable > 0 && Input.GetMouseButton(0))
         {
+            RaycastHit hit;
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out hit, 1000) && hit.transform.gameObject.layer == LayerMask.NameToLayer("SpawnAllowed"))
             {
                 canSpawn = false;
