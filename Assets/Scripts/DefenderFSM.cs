@@ -2,6 +2,7 @@ using CRBT;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices.WindowsRuntime;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UIElements;
@@ -70,24 +71,50 @@ public class DefenderFSM : MonoBehaviour
 
         GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
 
+        DTDecision hasATargetD = new DTDecision((b) => HasATarget());
+        DTDecision hasATargetInsideFortD = new DTDecision((b) => HasATarget());
 
-        BTCondition hasATarget = new BTCondition(HasATarget);
-        BTCondition isTargetInSight = new BTCondition(IsTargetInSight);
-        BTCondition isTargetInRange = new BTCondition(TargetIsInRange);
-        BTAction attack = new BTAction(AttackTarget);
-        BTCondition isTargetAlive = new BTCondition(IsTargetAlive);
+        DTAction acquireTarget = new DTAction((b) =>
+        { 
+            PickAnEnemy();
+            return null;
+        });
+        DTAction acquireTargetInsideFort = new DTAction((b) =>
+        {
+            PickAnEnemyInsideFort();
+            return null;
+        });
+        DTDecision isInRange = new DTDecision((b) => TargetIsInRange());
+        DTAction releaseTargetD = new DTAction((b) => ReleaseTarget());
+        DTDecision isTargetInSightD = new DTDecision((b) => IsTargetInSight());
+        DTDecision isTargetAliveD = new DTDecision((b) => IsTargetAlive());
+        DTAction attackD = new DTAction((b) => AttackTarget());
 
-        BTAction releaseTargetAction = new BTAction(ReleaseTarget);
-        BTSequence attackSequence = new BTSequence(new IBTTask[] { hasATarget, isTargetInRange, isTargetInSight, attack, isTargetAlive });
+        //to attack outside fort
+        hasATargetD.AddLink(false, acquireTarget);
+        hasATargetD.AddLink(true, isInRange);
+        //to attack inside fort
+        hasATargetInsideFortD.AddLink(true, isInRange);
+        hasATargetInsideFortD.AddLink(false, acquireTargetInsideFort);
 
-        BTSelector attackOrReleaseTarget = new BTSelector(new IBTTask[] { attackSequence, releaseTargetAction });
+        isInRange.AddLink(false, releaseTargetD);
+        isInRange.AddLink(true, isTargetInSightD);
 
-        BehaviorTree attackBT = new BehaviorTree(attackOrReleaseTarget);
+        isTargetInSightD.AddLink(false, releaseTargetD);
+        isTargetInSightD.AddLink(true, isTargetAliveD);
+
+        isTargetAliveD.AddLink(false, releaseTargetD);
+        isTargetAliveD.AddLink(true, attackD);
+
+        DecisionTree attackDT = new DecisionTree(hasATargetD);
+        DecisionTree attackInsideFortDT = new DecisionTree(hasATargetInsideFortD);
+
+       
 
         FSMAction resetAgentPath = () => agent.ResetPath();
         FSMAction releaseTarget = () => target = null;
         FSMAction setAllyToHelpAsDestination = () => destination = allyToHelp != null ? allyToHelp.transform.position : destination;
-        FSMAction attackTarget = () => attackBT.Step();
+        FSMAction attackTarget = () => attackDT.walk();
 
         FSMState attackEnemiesOutsideFortState = new FSMState();
         attackEnemiesOutsideFortState.stayActions.Add(PickAnEnemy);
@@ -107,13 +134,16 @@ public class DefenderFSM : MonoBehaviour
 
         FSMState helpAllyState = new FSMState();
 
-        BTCondition agentIsStill = new BTCondition(() => agent.velocity == Vector3.zero);
 
         //provare con test sulla velocity
-        BTSequence attackEnemiesWhenArrived = new BTSequence(new IBTTask[]{agentIsStill, attackOrReleaseTarget});
-        BehaviorTree helpWithHordeBT = new BehaviorTree(attackEnemiesWhenArrived);
 
-        FSMAction helpWithHordeAction = () => helpWithHordeBT.Step();
+        DTDecision hasArrivedD = new DTDecision((b) => Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f);
+        hasArrivedD.AddLink(true, hasATargetInsideFortD);
+
+        DecisionTree helpWithHordeDT = new DecisionTree(hasArrivedD);
+
+
+        FSMAction helpWithHordeAction = () => helpWithHordeDT.walk();
 
         helpAllyState.enterActions.Add(() => Debug.Log(gameObject.name + "Entering horde help"));
         helpAllyState.enterActions.Add(setAllyToHelpAsDestination);
@@ -147,46 +177,45 @@ public class DefenderFSM : MonoBehaviour
         attackEnemiesInsideFortState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering defend yard"));
         attackEnemiesInsideFortState.enterActions.Add(resetAgentPath);
 
-        attackEnemiesInsideFortState.stayActions.Add(AttackEnemyInsideFort);
+        attackEnemiesInsideFortState.stayActions.Add(() => attackInsideFortDT.walk());
 
         attackEnemiesInsideFortState.exitActions = new List<FSMAction>(){releaseTarget, resetAllyToHelp};
 
         FSMState fleeState = new FSMState();
+        
         fleeState.enterActions.Add(() => agent.autoBraking = false);
         fleeState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering flee"));
 
-        //NON ATTACCANO QUANDO AIUTANO
-
+        //TODO sistemare flee, escono da flee quando sono liberi non quando si sono allontanato abbastanza
         fleeState.stayActions.Add(Flee);
 
         fleeState.exitActions.Add(() => agent.autoBraking = true);
 
-        BTCall hasAllyToHelp = () => allyToHelp != null;
 
-        BTCondition hasAllyToHelpCondition = new BTCondition(hasAllyToHelp);
+        DTDecision hasAllyToHelpD = new DTDecision((b) => allyToHelp != null);
+        DTDecision isAllyToHelpTooFarD = new DTDecision((b) =>
+            Vector3.Distance(transform.position, allyToHelp.transform.position) > attackRange);
+        DTAction getCloseToAllyD = new DTAction((b) => GetCloseToAlly());
+        DTDecision hasATargetSurroundingAlly = new DTDecision((b) => HasATarget());
+        DTAction pickEnemySurroundingAlly = new DTAction((b) => PickEnemyWhoIsSurroundingAlly());
 
+        hasAllyToHelpD.AddLink(true, isAllyToHelpTooFarD);
 
-        BTCall allyIsToFar = () => Vector3.Distance(transform.position, allyToHelp.transform.position) > attackRange;
-        BTAction getCloseToAlly = new BTAction(GetCloseToAlly);
+        isAllyToHelpTooFarD.AddLink(true, getCloseToAllyD);
+        isAllyToHelpTooFarD.AddLink(false, hasATargetSurroundingAlly);
 
-        BTDecoratorFilter getCloseToAllyIfIsTooFar = new BTDecoratorFilter(allyIsToFar, getCloseToAlly);
+        hasATargetSurroundingAlly.AddLink(true, isInRange);
+        hasATargetSurroundingAlly.AddLink(false, pickEnemySurroundingAlly);
 
-        BTSequence helpSurroundedAllySequence = new BTSequence(new IBTTask[]
-        {
-            hasAllyToHelpCondition,
-            getCloseToAllyIfIsTooFar,
-            new BTAction(PickEnemyWhoIsSurroundingAlly),
-            attackEnemiesWhenArrived
-        });
-        BehaviorTree helpSurroundedAllyBT = new BehaviorTree(helpSurroundedAllySequence);
+        DecisionTree helpSurroundedAllyDT = new DecisionTree(hasAllyToHelpD);
 
         FSMState helpSurroundedAllyState = new FSMState();
         helpSurroundedAllyState.enterActions.Add(() => allyToHelp = Utils.GetNearestObject(transform.position, GetSurroundedAllies()));
-        helpSurroundedAllyState.stayActions.Add(() => helpSurroundedAllyBT.Step());
+        helpSurroundedAllyState.stayActions.Add(() => helpSurroundedAllyDT.walk());
         helpSurroundedAllyState.exitActions.Add(resetAllyToHelp);
         helpSurroundedAllyState.enterActions.Add(() => Debug.Log(gameObject.name + " Entering help"));
 
-        FSMTransition defendToHelp = new FSMTransition(() => dcc.IsAnyoneSurrounded().Length != 0);
+        FSMTransition defendToHelp = new FSMTransition(() => dcc.IsAnyoneSurrounded().Length != 0 && ! AmISurrounded());
         attackEnemiesInsideFortState.AddTransition(defendToHelp, helpSurroundedAllyState);
         FSMTransition helpToFlee = new FSMTransition(AmISurrounded);
         helpSurroundedAllyState.AddTransition(helpToFlee, fleeState);
@@ -287,17 +316,6 @@ public class DefenderFSM : MonoBehaviour
         return true;
     }
 
-    private void AttackEnemyInsideFort()
-    {
-        if (target == null) PickAnEnemyInsideFort();
-        if (!TargetIsInRange())
-        {
-            target = null;
-            return;
-        }
-        target.GetComponent<HealthController>().TakeDamage(attackDamage);
-        if (target.GetComponent<HealthController>().Health == 0) target = null;
-    }
 
     private GameObject[] GetSurroundedAllies()
     {
@@ -355,7 +373,7 @@ public class DefenderFSM : MonoBehaviour
         Vector3 fleeDestination = transform.position + fleeDirection * fleeDistance;
         NavMeshHit hit;
 
-        if (NavMesh.SamplePosition(fleeDestination, out hit, 3f, navMeshAreaMask))
+        if (NavMesh.SamplePosition(fleeDestination, out hit, 5f, navMeshAreaMask))
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
             agent.SetDestination(hit.position);
@@ -364,7 +382,17 @@ public class DefenderFSM : MonoBehaviour
 
         Vector3 left = transform.position + Quaternion.Euler(0, -90, 0) * fleeDirection * fleeDistance;
 
-        if (NavMesh.SamplePosition(left, out hit, 3f, navMeshAreaMask))
+        if (NavMesh.SamplePosition(left, out hit, 5f, navMeshAreaMask))
+        {
+            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
+
+            agent.SetDestination(hit.position);
+            return;
+        }
+
+        Vector3 right = transform.position + Quaternion.Euler(0, 90, 0) * fleeDirection * fleeDistance;
+
+        if (NavMesh.SamplePosition(right, out hit, 5f ,navMeshAreaMask))
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
 
@@ -372,14 +400,13 @@ public class DefenderFSM : MonoBehaviour
             return;
         }
 
-        Vector3 right = transform.position + Quaternion.Euler(0, 90, 0) * fleeDirection * fleeDistance;
-        Debug.DrawLine(transform.position, right, Color.red, 5f);
+        Vector3 forward = transform.position + -fleeDirection * fleeDistance;
 
-        if (NavMesh.SamplePosition(right, out hit, 3f ,navMeshAreaMask))
+        if (NavMesh.SamplePosition(forward, out hit, 5f, navMeshAreaMask))
         {
             Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
 
-             agent.SetDestination(hit.position);
+            agent.SetDestination(hit.position);
             return;
         }
 
@@ -407,47 +434,9 @@ public class DefenderFSM : MonoBehaviour
 
     public bool AmIClear()
     {
-        return !AmISurrounded();
+        return ! AmISurrounded() && Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f;
     }
 
-    private void GetAllyToHelpWithHorde()
-    {
-        if (allyToHelp == null)
-        {
-            allyToHelp = dcc.DoesItNeedHelpWithHorde(gameObject);
-        }
-    }
-
-    private bool DoesAnyoneNeedHelpWithHorde()
-    {
-        foreach (var def in defenders)
-        {
-            if (def != null && def != gameObject)
-            {
-                if (def.GetComponent<DefenderFSM>().HasHorde())
-                {
-                    allyToHelp = def;
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private void CommunicateHelping()
-    {
-        if (allyToHelp != null)
-        {
-            dcc.HelpDefenderWithHorde(gameObject, allyToHelp);
-        }
-    }
-
-    private bool SetDefenderToHelpAsDestination()
-    {
-        if (allyToHelp == null) return false;
-        destination = allyToHelp.transform.position;
-        return true;
-    }
 
     private bool HasHordeBeenDestroyed()
     {
@@ -470,17 +459,12 @@ public class DefenderFSM : MonoBehaviour
 
     private void MoveToDestination()
     {
-        if (destination != null && ! agent.hasPath)
+        if (! agent.hasPath)
         {
             agent.SetDestination(destination);
         }
     }
 
-    private bool HasNotArrivedToDestination()
-    {
-        if (destination == null) return false;
-        return Vector3.Distance(transform.position, destination) > arrivingRange;
-    }
 
     private void UpdateHordeStatus()
     {
@@ -546,35 +530,10 @@ public class DefenderFSM : MonoBehaviour
     }
 
     
-
-
-    private void NotUseThis()
-    {
-        if (target == null) return;
-
-        HealthController hc;
-        if (! IsTargetInSight())
-        {
-            target = null;
-            return;
-        }
-        if (target.TryGetComponent<HealthController>(out hc))
-        {
-            hc.TakeDamage(attackDamage);
-            GameObject proj = Instantiate(projectile, transform.position, transform.rotation);
-            proj.GetComponent<Rigidbody>().AddForce((target.transform.position - transform.position).normalized * 30f, ForceMode.Impulse);
-            if (hc.Health == 0)
-            {
-                target = null;
-                return;
-            }
-        }
-        target = null;
-    }
-
     private bool AttackTarget()
     {
         HealthController hc;
+        if (target == null) return true;
         if (!target.TryGetComponent<HealthController>(out hc)) return false;
         Debug.Log(gameObject.name + " attacking" + target.name);
         hc.TakeDamage(attackDamage);
@@ -582,18 +541,10 @@ public class DefenderFSM : MonoBehaviour
         return true;
     }
 
-    private void temp()
-    {
-        BTCondition hasATarget = new BTCondition(HasATarget);
-        BTCondition isTargetInSight = new BTCondition(IsTargetInSight);
-        BTAction attack = new BTAction(AttackTarget);
-        BTCondition isTargetAlive = new BTCondition(IsTargetAlive);
-
-        BTSequence attackSequence = new BTSequence(new IBTTask[] {hasATarget, isTargetInSight, attack, isTargetAlive});
-    }
 
     private bool IsTargetAlive()
     {
+        if (target == null) return true;
         if (!target.TryGetComponent<HealthController>(out var hc)) return false;
 
         return hc.Health != 0;

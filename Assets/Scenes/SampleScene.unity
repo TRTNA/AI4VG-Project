@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.44657826, g: 0.49641263, b: 0.57481676, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657898, g: 0.4964133, b: 0.5748178, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -229,13 +229,17 @@ PrefabInstance:
       propertyPath: m_Name
       value: Zombie (6)
       objectReference: {fileID: 0}
+    - target: {fileID: 1755280981543610473, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
+      propertyPath: runSpeed
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
       value: 16
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -22.1
+      value: -15.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.y
@@ -243,7 +247,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -30.62
+      value: -34.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalRotation.w
@@ -978,13 +982,17 @@ PrefabInstance:
       propertyPath: m_Name
       value: Zombie (4)
       objectReference: {fileID: 0}
+    - target: {fileID: 1755280981543610473, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
+      propertyPath: runSpeed
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
       value: 14
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -22.1
+      value: -15.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.y
@@ -992,7 +1000,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -30.62
+      value: -34.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1345,13 +1353,17 @@ PrefabInstance:
       propertyPath: m_Name
       value: Zombie (5)
       objectReference: {fileID: 0}
+    - target: {fileID: 1755280981543610473, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
+      propertyPath: runSpeed
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
       value: 15
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -22.1
+      value: -15.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.y
@@ -1359,7 +1371,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -30.62
+      value: -34.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1878,13 +1890,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11de167a8db0f6e45b007f432b72fd4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 17
-  attackDamage: 5
-  surroundedRange: 10
-  surroundedThreshold: 6
-  fleeDistance: 8
+  attackRange: 18.6
+  attackDamage: 3.5
+  surroundedRange: 5.1
+  surroundedThreshold: 3
+  fleeDistance: 7.06
   rotationSpeed: 5
-  reactionTime: 1
+  reactionTime: 0.5
   hordeLimit: 2
   target: {fileID: 0}
   destination: {x: 0, y: 0, z: 0}
@@ -2759,13 +2771,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11de167a8db0f6e45b007f432b72fd4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 17
-  attackDamage: 5
-  surroundedRange: 10
-  surroundedThreshold: 6
-  fleeDistance: 8
+  attackRange: 18.6
+  attackDamage: 3.5
+  surroundedRange: 5.1
+  surroundedThreshold: 3
+  fleeDistance: 7.06
   rotationSpeed: 5
-  reactionTime: 1
+  reactionTime: 0.5
   hordeLimit: 2
   target: {fileID: 0}
   destination: {x: 0, y: 0, z: 0}
@@ -3305,13 +3317,17 @@ PrefabInstance:
       propertyPath: m_Name
       value: Zombie (7)
       objectReference: {fileID: 0}
+    - target: {fileID: 1755280981543610473, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
+      propertyPath: runSpeed
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
       value: 17
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -22.1
+      value: -15.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.y
@@ -3319,7 +3335,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -30.62
+      value: -34.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3650,12 +3666,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   attackRange: 17
-  attackDamage: 5
-  surroundedRange: 10
-  surroundedThreshold: 6
-  fleeDistance: 8
+  attackDamage: 3.5
+  surroundedRange: 5.1
+  surroundedThreshold: 3
+  fleeDistance: 7.06
   rotationSpeed: 5
-  reactionTime: 1
+  reactionTime: 0.5
   hordeLimit: 2
   target: {fileID: 0}
   destination: {x: 0, y: 0, z: 0}
@@ -3970,7 +3986,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -22.1
+      value: -15.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.y
@@ -3978,7 +3994,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -30.62
+      value: -34.7
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_LocalRotation.w
