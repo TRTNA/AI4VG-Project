@@ -119,7 +119,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   reactionTime: 1
-  walkSpeed: 1.5
+  walkSpeed: 3
   runSpeed: 3
   interactionRange: 5
   damage: 1
