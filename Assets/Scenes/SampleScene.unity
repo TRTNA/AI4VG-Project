@@ -766,6 +766,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackRange
+      value: 23.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackDamage
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name
       value: Defender (3)
@@ -4981,7 +4989,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   toSpawn: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
-  unitsAvailable: 10
+  unitsAvailable: 30
   spawnCooldown: 1
   yOffset: 1
 --- !u!4 &1020553533
@@ -7908,6 +7916,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackRange
+      value: 23.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackDamage
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name
       value: Defender (2)
@@ -9684,6 +9700,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackRange
+      value: 23.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackDamage
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name
       value: Defender (1)
@@ -9740,6 +9764,14 @@ PrefabInstance:
     - target: {fileID: 5459260421097882165, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackRange
+      value: 23.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: attackDamage
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name

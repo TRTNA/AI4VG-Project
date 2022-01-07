@@ -134,8 +134,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11de167a8db0f6e45b007f432b72fd4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 18.6
-  attackDamage: 9.9
+  attackRange: 23.1
+  attackDamage: 5
   surroundedRange: 5.1
   surroundedThreshold: 4
   fleeDistance: 7.06

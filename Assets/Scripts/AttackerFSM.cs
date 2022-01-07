@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -34,14 +35,16 @@ public class AttackerFSM : MonoBehaviour, IObserver
     private Animator anim;
 
     private GameObject[] fortsGates;
+    private GameObject[] defenders;
     private GameObject nearestGate;
-    private GameObject target;
+    public GameObject target;
     private Vector3 destination;
 
     private Transform constrainedAreaCenter;
     private int navMeshAreaMask;
 
     private bool registeredToTarget = false;
+    private readonly float randomEnemyPickingProbability = 0.5f;
     #endregion
 
     void Start()
@@ -53,39 +56,26 @@ public class AttackerFSM : MonoBehaviour, IObserver
         GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
         anim = GetComponent<Animator>();
         fortsGates = GameObject.FindGameObjectsWithTag("Gate");
+        defenders = GameObject.FindGameObjectsWithTag("Defender");
 
         #region STATE: breaching
         FSMState breaching = new FSMState();
         breaching.enterActions.Add(FindNearestGate);
         DecisionTree breachingDT = CreateBreachingDecisionTree();
         breaching.stayActions.Add(() => breachingDT.walk());
+        breaching.exitActions.Add(() => target = null);
         #endregion
 
-        //todo rimuovere stato wandering e lasciare stato attacking con DT per comportamento (attacco se sono vicino altrimenti mi avvicino)
-        #region STATE: wandering
-        FSMState wandering = new FSMState();
-        wandering.enterActions.Add(SetAgentWanderingParams);
-        wandering.stayActions.Add(Wander);
-        wandering.stayActions.Add(LookForAnEnemy);
-        wandering.exitActions.Add(() => agent.autoBraking = true);
-        #endregion
 
         #region STATE: attacking
         FSMState attacking = new FSMState();
         DecisionTree attackingDT = CreateAttackingDecisionTree();
         attacking.stayActions.Add(() => attackingDT.walk());
-        attacking.exitActions.Add(ReleaseTarget);
         #endregion
 
         #region TRANSITIONS
-        FSMTransition attackingToWandering = new FSMTransition(IsTargetReleased);
-        attacking.AddTransition(attackingToWandering, wandering);
-
-        FSMTransition wanderingToAttacking = new FSMTransition(IsTargetAcquired);
-        wandering.AddTransition(wanderingToAttacking, attacking);
-
-        FSMTransition breachingToWandering = new FSMTransition(NearestGateIsWithingInteractionRateAndBreached);
-        breaching.AddTransition(breachingToWandering, wandering);
+        FSMTransition breachingToAttacking = new FSMTransition(NearestGateIsWithingInteractionRateAndBreached);
+        breaching.AddTransition(breachingToAttacking, attacking);
         #endregion
 
         fsm = new FSM(breaching);
@@ -119,7 +109,9 @@ public class AttackerFSM : MonoBehaviour, IObserver
 
     private DecisionTree CreateAttackingDecisionTree()
     {
+        DTDecision hasATarget = new DTDecision((b) => target != null);
         DTDecision isTargetWithinInteractionRange = new DTDecision((bundle) => IsObjectWithinInteractionRange(target));
+        DTAction pickAnEnemy = new DTAction(PickAnEnemy);
         DTAction seekTarget = new DTAction((bundle) =>
         {
             if (target != null)
@@ -131,10 +123,15 @@ public class AttackerFSM : MonoBehaviour, IObserver
             return false;
         });
         DTAction attackTarget = new DTAction(AttackTarget);
+        hasATarget.AddLink(true, isTargetWithinInteractionRange);
+        hasATarget.AddLink(false, pickAnEnemy);
+
         isTargetWithinInteractionRange.AddLink(true, attackTarget);
         isTargetWithinInteractionRange.AddLink(false, seekTarget);
 
-        return new DecisionTree(isTargetWithinInteractionRange);
+        
+
+        return new DecisionTree(hasATarget);
     }
     #endregion
 
@@ -177,42 +174,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
         return false;
     }
 
-    private void Wander()
-    {
-        anim.Play("Base Layer.Walk");
-        agent.SetDestination(GetWanderDestination());
-    }
 
-    private void SetAgentWanderingParams()
-    {
-        agent.speed = walkSpeed;
-        agent.autoBraking = false;
-    }
-
-    private Vector3 GetWanderDestination()
-    {
-        Vector3 targetCircleCenter = transform.position + Vector3.forward * circleForwardOffset;
-        Vector2 randomPoint = UnityEngine.Random.insideUnitCircle * circleRay;
-        Vector3 wanderDestination = new Vector3(randomPoint.x, 0, randomPoint.y) + targetCircleCenter;
-
-        NavMeshHit hit;
-        bool targetOnArea = !NavMesh.Raycast(transform.position, wanderDestination, out hit, navMeshAreaMask);
-        bool agentOnArea = NavMesh.SamplePosition(transform.position, out hit, 0.1f, 8);
-
-        //if agent is on the area and target is not, find a random point on area and return it as destination
-        if (!targetOnArea)
-        {
-            Vector3 randomPositionInConstrainedArea = UnityEngine.Random.insideUnitSphere * circleForwardOffset + constrainedAreaCenter.position;
-            NavMesh.SamplePosition(randomPositionInConstrainedArea, out hit, circleForwardOffset, navMeshAreaMask);
-            wanderDestination = hit.position;
-        }
-        //if either agent and target are not on the area return constrained area center as destination
-        if (!agentOnArea && !targetOnArea)
-        {
-            wanderDestination = constrainedAreaCenter.position;
-        }
-        return wanderDestination;
-    }
 
     private object ReachFortsCenter(object bundle)
     {
@@ -222,7 +184,35 @@ public class AttackerFSM : MonoBehaviour, IObserver
         return WalkToDestination(null);
     }
 
+    private GameObject[] RemoveDeadDefenders(GameObject[] defs)
+    {
+        List<GameObject> temp = new List<GameObject>();
+        foreach (var def in defs)
+        {
+            if (def != null) temp.Add(def);
+        }
+
+        return temp.ToArray();
+    }
+
     #endregion
+
+    //probability to pick a random enemy instead of the closest one
+    private object PickAnEnemy(object bundle)
+    {
+        defenders = RemoveDeadDefenders(defenders);
+        if (defenders.Length == 0) return false;
+        if (Random.Range(0f, 1f) > randomEnemyPickingProbability)
+        {
+            target = defenders[Random.Range(0, defenders.Length)];
+            return true;
+        }
+        else
+        {
+            target = Utils.GetNearestObject(transform.position, defenders);
+            return true;
+        }
+    }
 
     #region METHODS: attacking actions
     private void LookForAnEnemy()
@@ -232,8 +222,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
         Utils.Shuffle(ref enemies);
         foreach (GameObject enemy in enemies)
         {
-                AcquireTarget(enemy);
-  
+            AcquireTarget(enemy);
         }
     }
 
@@ -250,6 +239,11 @@ public class AttackerFSM : MonoBehaviour, IObserver
             }
             anim.Play("Base Layer.Attack");
             hc.TakeDamage(damage);
+            if (hc.Health != 0)
+            {
+                target = null;
+                return false;
+            }
             return true;
         }
         return false;
@@ -284,16 +278,6 @@ public class AttackerFSM : MonoBehaviour, IObserver
         return obj != null && Vector3.Distance(transform.position, obj.transform.position) < interactionRange;
     }
 
-
-    private bool IsTargetAcquired()
-    {
-        return target != null;
-    }
-
-    private bool IsTargetReleased()
-    {
-        return target == null;
-    }
 
 
     #endregion
