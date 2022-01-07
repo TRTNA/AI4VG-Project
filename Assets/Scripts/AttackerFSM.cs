@@ -44,6 +44,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
     private int navMeshAreaMask;
 
     private bool registeredToTarget = false;
+    private bool endGame = false;
     private readonly float randomEnemyPickingProbability = 0.5f;
     #endregion
 
@@ -66,6 +67,22 @@ public class AttackerFSM : MonoBehaviour, IObserver
         breaching.exitActions.Add(() => target = null);
         #endregion
 
+        FSMState idle = new FSMState();
+        idle.enterActions.Add(() =>
+        {
+            target = null;
+            agent.isStopped = true;
+            
+        });
+        idle.stayActions.Add(() =>
+        {
+            target = null;
+            agent.isStopped = true;
+            anim.Play("Base Layer.Idle1");
+
+
+        });
+
 
         #region STATE: attacking
         FSMState attacking = new FSMState();
@@ -76,6 +93,8 @@ public class AttackerFSM : MonoBehaviour, IObserver
         #region TRANSITIONS
         FSMTransition breachingToAttacking = new FSMTransition(NearestGateIsWithingInteractionRateAndBreached);
         breaching.AddTransition(breachingToAttacking, attacking);
+        FSMTransition toIdle = new FSMTransition(() => endGame);
+        attacking.AddTransition(toIdle, idle);
         #endregion
 
         fsm = new FSM(breaching);
@@ -123,13 +142,13 @@ public class AttackerFSM : MonoBehaviour, IObserver
             return false;
         });
         DTAction attackTarget = new DTAction(AttackTarget);
-        hasATarget.AddLink(true, isTargetWithinInteractionRange);
-        hasATarget.AddLink(false, pickAnEnemy);
+
 
         isTargetWithinInteractionRange.AddLink(true, attackTarget);
         isTargetWithinInteractionRange.AddLink(false, seekTarget);
 
-        
+        hasATarget.AddLink(true, isTargetWithinInteractionRange);
+        hasATarget.AddLink(false, pickAnEnemy);
 
         return new DecisionTree(hasATarget);
     }
@@ -201,7 +220,11 @@ public class AttackerFSM : MonoBehaviour, IObserver
     private object PickAnEnemy(object bundle)
     {
         defenders = RemoveDeadDefenders(defenders);
-        if (defenders.Length == 0) return false;
+        if (defenders.Length == 0)
+        {
+            endGame = true;
+            return false;
+        }
         if (Random.Range(0f, 1f) > randomEnemyPickingProbability)
         {
             target = defenders[Random.Range(0, defenders.Length)];
@@ -239,7 +262,7 @@ public class AttackerFSM : MonoBehaviour, IObserver
             }
             anim.Play("Base Layer.Attack");
             hc.TakeDamage(damage);
-            if (hc.Health != 0)
+            if (hc.Health == 0)
             {
                 target = null;
                 return false;

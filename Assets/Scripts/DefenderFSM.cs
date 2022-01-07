@@ -36,7 +36,7 @@ public class DefenderFSM : MonoBehaviour
 
 
 
-    private int navMeshAreaMask;
+    private int fortNavMeshAreaMask;
     private FSM fsm;
     private NavMeshAgent agent;
     private DefendersCooperationController dcc;
@@ -54,7 +54,7 @@ public class DefenderFSM : MonoBehaviour
     {
         agent = GetComponent<NavMeshAgent>();
         dcc = GameObject.Find("DefendersCooperationController").GetComponent<DefendersCooperationController>();
-        navMeshAreaMask = 1<<NavMesh.GetAreaFromName("Fort");
+        fortNavMeshAreaMask = 1<<NavMesh.GetAreaFromName("Fort");
         defenders = GameObject.FindGameObjectsWithTag("Defender");
         List<GameObject> temp = new List<GameObject>();
         foreach (var defender in defenders)
@@ -428,8 +428,7 @@ public class DefenderFSM : MonoBehaviour
 
     #region Surrounded method
 
-    //TODO refactor this
-    private void Flee()
+    private GameObject[] GetSurroundingEnemies()
     {
         Collider[] objectsAround = Physics.OverlapSphere(transform.position, surroundedRange);
         List<GameObject> enemies = new List<GameObject>();
@@ -443,63 +442,43 @@ public class DefenderFSM : MonoBehaviour
 
             }
         }
-        enemiesSurrounding = enemies.ToArray();
+        return enemies.ToArray();
+    }
 
-        //temporary
-        if (enemiesSurrounding == null || enemiesSurrounding.Length == 0) agent.SetDestination(Vector3.zero);
 
-        Vector3 averageEnemiesDirection = new Vector3();
-        for (int i = 0; i < enemiesSurrounding.Length; i++)
+    private void Flee()
+    {
+        enemiesSurrounding = GetSurroundingEnemies();
+        if (enemiesSurrounding == null || enemiesSurrounding.Length == 0) return;
+
+        Vector3 fleeDirection = (-1 * GetAverageEnemiesDirection(enemiesSurrounding)).normalized;
+        NavMeshHit hit;
+        float[] rotationValues = { 0, -10, 30, -90, 90, 180 };
+        foreach (var rotationValue in rotationValues)
         {
-            Vector3 dir = Vector3.ProjectOnPlane(enemiesSurrounding[i].transform.position - transform.position, Vector3.up);
+            Vector3 dir = transform.position + Quaternion.Euler(0, rotationValue, 0) * fleeDirection * fleeDistance;
+            if (NavMesh.SamplePosition(dir, out hit, 5f, fortNavMeshAreaMask))
+            {
+                Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
+                agent.SetDestination(hit.position);
+                return;
+            }
+        }
+        agent.SetDestination(Vector3.zero);
+
+    }
+
+    private Vector3 GetAverageEnemiesDirection(GameObject[] enemies)
+    {
+        Vector3 averageEnemiesDirection = new Vector3();
+        foreach (var enemy in enemies)
+        {
+            Vector3 dir = Vector3.ProjectOnPlane(enemy.transform.position - transform.position, Vector3.up);
             averageEnemiesDirection += dir;
         }
 
-        averageEnemiesDirection /= enemiesSurrounding.Length;
-        Vector3 fleeDirection = (-averageEnemiesDirection).normalized;
-        Vector3 fleeDestination = transform.position + fleeDirection * fleeDistance;
-        NavMeshHit hit;
-
-        if (NavMesh.SamplePosition(fleeDestination, out hit, 5f, navMeshAreaMask))
-        {
-            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
-            agent.SetDestination(hit.position);
-            return;
-        }
-
-        Vector3 left = transform.position + Quaternion.Euler(0, -90, 0) * fleeDirection * fleeDistance;
-
-        if (NavMesh.SamplePosition(left, out hit, 5f, navMeshAreaMask))
-        {
-            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
-
-            agent.SetDestination(hit.position);
-            return;
-        }
-
-        Vector3 right = transform.position + Quaternion.Euler(0, 90, 0) * fleeDirection * fleeDistance;
-
-        if (NavMesh.SamplePosition(right, out hit, 5f, navMeshAreaMask))
-        {
-            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
-
-            agent.SetDestination(hit.position);
-            return;
-        }
-
-        Vector3 forward = transform.position + -fleeDirection * fleeDistance;
-
-        if (NavMesh.SamplePosition(forward, out hit, 5f, navMeshAreaMask))
-        {
-            Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
-
-            agent.SetDestination(hit.position);
-            return;
-        }
-
-        //temporary
-        agent.SetDestination(Vector3.zero);
-
+        averageEnemiesDirection /= enemies.Length;
+        return averageEnemiesDirection;
     }
 
     public bool AmISurrounded()
