@@ -36,7 +36,8 @@ public class DefenderFSM : MonoBehaviour
     private int fortNavMeshAreaMask;
     private FSM fsm;
     private NavMeshAgent agent;
-    private DefendersCooperationController dcc;
+
+    private GameObject[] defensivePositions;
 
     private GameObject[] defenders;
     private bool hordeStatus;
@@ -51,9 +52,9 @@ public class DefenderFSM : MonoBehaviour
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
-        dcc = GameObject.Find("DefendersCooperationController").GetComponent<DefendersCooperationController>();
         fortNavMeshAreaMask = 1 << NavMesh.GetAreaFromName("Fort");
         defenders = GameObject.FindGameObjectsWithTag("Defender");
+        defensivePositions = GameObject.FindGameObjectsWithTag("DefensivePosition");
         List<GameObject> temp = new List<GameObject>();
         foreach (var defender in defenders)
         {
@@ -217,6 +218,7 @@ public class DefenderFSM : MonoBehaviour
 
     }
 
+
     private bool IsAllyToHelpStillSurrounded()
     {
         return allyToHelp == null || ! allyToHelp.GetComponent<DefenderFSM>().IsSurrounded();
@@ -254,10 +256,14 @@ public class DefenderFSM : MonoBehaviour
 
     private void FindAnEmptyDefensivePosition()
     {
-        GameObject defPos = dcc.ReserveNearestEmptyDefensivePosition(gameObject);
-        if (defPos != null)
+        foreach (var defPos in Utils.SortByDistance(transform.position, defensivePositions))
         {
-            destination = defPos.transform.position;
+            bool reserved = defPos.GetComponent<DefensivePosition>().Reserve(gameObject);
+            if (reserved)
+            {
+                destination = defPos.transform.position;
+                return;
+            }
         }
     }
 
