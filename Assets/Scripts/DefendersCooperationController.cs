@@ -32,23 +32,13 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
         {
             def.GetComponent<DefensivePosition>().AddObserver(this);
         }
-        StartCoroutine(UpdateStatus());
+        StartCoroutine(UpdateHordeStatus());
     }
 
 
-    public GameObject[] IsAnyoneSurrounded()
+    public bool IsAllyStillSurrounded(GameObject ally)
     {
-        List<GameObject> surroundedAllies = new List<GameObject>();
-        foreach (var ally in defenders)
-        {
-            if (ally != null && ally.GetComponent<DefenderFSM>().AmISurrounded()) surroundedAllies.Add(ally);
-        }
-        return surroundedAllies.ToArray();
-    }
-
-    public bool IsStillSurrounded(GameObject ally)
-    {
-        return ally != null ? ally.GetComponent<DefenderFSM>().AmISurrounded() : false;
+        return ally != null && ally.GetComponent<DefenderFSM>().IsSurrounded();
     }
 
     public GameObject ReserveNearestEmptyDefensivePosition(GameObject defender)
@@ -65,7 +55,8 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
         return nearest;
     }
 
-    IEnumerator UpdateStatus()
+
+    IEnumerator UpdateHordeStatus()
     {
         while (true)
         {
@@ -75,12 +66,11 @@ public class DefendersCooperationController : MonoBehaviour, IObserver
                 if (def != null) temp.Add(def);
             }
             defenders = temp.ToArray();
-            bool hasHorde = false;
             foreach (var def in defenders)
             {
                 hordeStatus[def] = def.GetComponent<DefenderFSM>().HasHorde();
                 //if has not a horde, nobody has to help it
-                if (! hasHorde)
+                if (! hordeStatus[def])
                 {
                     whoIsHelpingWho[def] = null;
                 }
