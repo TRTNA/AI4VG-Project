@@ -34,7 +34,7 @@ public class DefenderFSM : MonoBehaviour
     private Vector3 destination;
 
     private int fortNavMeshAreaMask;
-    private FSM fsm;
+    private SubMachineState fsm;
     private NavMeshAgent agent;
 
     private bool hordeStatus;
@@ -125,31 +125,31 @@ public class DefenderFSM : MonoBehaviour
         FSMAction resetAllyToHelp = () => allyToHelp = null;
 
         //FSM states
-        FSMState attackFromWalls = new FSMState();
+        HFSMState attackFromWalls = new HFSMState();
         attackFromWalls.stayActions = new List<FSMAction> { UpdateHordeStatus, acquireTargetFSMAction, attackTarget, SeekHelpFromAllies };
         attackFromWalls.exitActions = new List<FSMAction> { releaseTarget, resetAgentPath };
 
-        FSMState returnToDefPos = new FSMState();
+        HFSMState returnToDefPos = new HFSMState();
         returnToDefPos.enterActions = new List<FSMAction> { FindAnEmptyDefensivePosition, MoveToDestination };
         returnToDefPos.exitActions.Add(resetAgentPath);
 
-        FSMState hordeHelp = new FSMState();
+        HFSMState hordeHelp = new HFSMState();
         hordeHelp.enterActions = new List<FSMAction>{ setAllyToHelpAsDestination, SetAgentDestination };
         hordeHelp.stayActions = new List<FSMAction>{ acquireTargetFSMAction, helpWithHordeAction };
         hordeHelp.exitActions = new List<FSMAction>{ releaseTarget, resetAllyToHelp, resetAgentPath };
 
-        FSMState defendYard = new FSMState();
+        HFSMState defendYard = new HFSMState();
         defendYard.enterActions.Add(resetAgentPath);
         defendYard.stayActions = new List<FSMAction>() { UpdateSurroundingEnemies, () => attackInsideFortDt.walk() };
         defendYard.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp };
 
-        FSMState flee = new FSMState();
+        HFSMState flee = new HFSMState();
         flee.enterActions.Add(() => agent.autoBraking = false);
         flee.stayActions.Add(UpdateSurroundingEnemies);
         flee.stayActions.Add(Flee);
         flee.exitActions.Add(() => agent.autoBraking = true);
 
-        FSMState surroundedAllyHelp = new FSMState();
+        HFSMState surroundedAllyHelp = new HFSMState();
         surroundedAllyHelp.enterActions.Add(() => allyToHelp = Utils.GetNearestObject(transform.position, GetSurroundedAllies()));
         surroundedAllyHelp.stayActions = new List<FSMAction> { UpdateSurroundingEnemies, () => helpSurroundedAllyDt.walk() };
         surroundedAllyHelp.exitActions.Add(resetAllyToHelp);
@@ -160,6 +160,8 @@ public class DefenderFSM : MonoBehaviour
         FSMCondition hasAnAllyToHelpAndHasNotAHorde = () => allyToHelp != null && HasHorde() == false;
 
         //FSM transitions
+        
+
         FSMTransition canHelpWithHorde = new FSMTransition(hasAnAllyToHelpAndHasNotAHorde);
         FSMTransition hordeDestroyed = new FSMTransition(HasHordeBeenDestroyed);
         FSMTransition outsideDefPos = new FSMTransition(IsOutsideDefensivePosition);
@@ -173,16 +175,12 @@ public class DefenderFSM : MonoBehaviour
         FSMTransition fortInvaded = new FSMTransition(isFortInvaded);
         FSMTransition fortClear = new FSMTransition(IsFortClear);
 
-
         attackFromWalls.AddTransition(canHelpWithHorde, hordeHelp);
         attackFromWalls.AddTransition(outsideDefPos, returnToDefPos);
-        attackFromWalls.AddTransition(fortInvaded, defendYard);
 
         hordeHelp.AddTransition(hordeDestroyed, returnToDefPos);
-        hordeHelp.AddTransition(fortInvaded, defendYard);
 
         returnToDefPos.AddTransition(insideDefPos, attackFromWalls);
-        returnToDefPos.AddTransition(fortInvaded, defendYard);
 
         surroundedAllyHelp.AddTransition(surrounded, flee);
         surroundedAllyHelp.AddTransition(allyToHelpIsClear, defendYard);
@@ -191,9 +189,14 @@ public class DefenderFSM : MonoBehaviour
 
         defendYard.AddTransition(canHelpSurroundedAlly, surroundedAllyHelp);
         defendYard.AddTransition(surrounded, flee);
-        defendYard.AddTransition(fortClear, returnToDefPos);
 
-        fsm = new FSM(attackFromWalls);
+        SubMachineState defendWallsSubMachineState = new SubMachineState(attackFromWalls);
+        SubMachineState defendYardSubMachineState = new SubMachineState(defendYard);
+        defendWallsSubMachineState.AddTransition(fortInvaded, defendYardSubMachineState);
+        defendYardSubMachineState.AddTransition(fortClear, defendWallsSubMachineState);
+
+        fsm = new SubMachineState(defendWallsSubMachineState);
+
         StartCoroutine(UpdateFsm());
     }
 
