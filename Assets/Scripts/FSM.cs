@@ -167,12 +167,16 @@ public class SubMachineState : IFSMState
 {
     // Current state
     public IFSMState current;
+    public IFSMState initial;
     public HFSMState me;
+    private readonly bool keepMemory;
 
-    public SubMachineState(IFSMState state)
+    public SubMachineState(IFSMState state, bool keepMemory = false)
     {
         me = new HFSMState();
         current = state;
+        initial = state;
+        this.keepMemory = keepMemory;
         current.Enter();
     }
 
@@ -183,11 +187,19 @@ public class SubMachineState : IFSMState
 
     public void Enter()
     {
-        me.Enter();
+        if (keepMemory)
+        {
+            me.Enter();
+            current.Enter();
+            return;
+        }
+        initial.Enter();
+        return;
     }
 
     public void Exit()
     {
+        current.Exit();
         me.Exit();
     }
 

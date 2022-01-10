@@ -44,11 +44,12 @@ public static class Utils
     public static GameObject[] SortByDistance(Vector3 source, GameObject[] objs)
     {
         List<GameObject> temp = new List<GameObject>(objs);
-        temp.Sort((go1, go2) => {
-
+        temp.Sort((go1, go2) =>
+        {
+            if (go1 == null || go2 == null) return 0;
             var d1 = Vector3.Distance(source, go1.transform.position);
             var d2 = Vector3.Distance(source, go2.transform.position);
-            if (d1 == d2) return 0;
+            if (d1.Equals(d2)) return 0;
             return d1 > d2 ? 1 : -1;
         });
         return temp.ToArray();

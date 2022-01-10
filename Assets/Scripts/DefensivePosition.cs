@@ -7,9 +7,9 @@ public class DefensivePosition : MonoBehaviour, ISubject
 {
     [Range(1, 20)]
     public float reservationExpiration = 10f;
-    private GameObject occupiedBy = null;
+    public GameObject occupiedBy = null;
     private ISet<IObserver> observers;
-    private GameObject reservedBy = null;
+    public GameObject reservedBy = null;
 
     public void Start()
     {
@@ -19,6 +19,7 @@ public class DefensivePosition : MonoBehaviour, ISubject
 
     public bool Reserve(GameObject obj)
     {
+        if (reservedBy == obj || occupiedBy == obj) return true;
         if (reservedBy != null || occupiedBy != null) return false;
         reservedBy = obj;
         StartCoroutine(ReservationExpire());
@@ -56,7 +57,7 @@ public class DefensivePosition : MonoBehaviour, ISubject
 
     private void OnTriggerEnter(Collider other)
     {
-        if (occupiedBy != null && other.CompareTag("Defender"))
+        if (occupiedBy == null && other.CompareTag("Defender"))
         {
             occupiedBy = other.gameObject;
             reservedBy = null;

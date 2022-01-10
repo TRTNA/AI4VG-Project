@@ -114,7 +114,7 @@ NavMeshAgent:
   m_Acceleration: 8
   avoidancePriority: 50
   m_AngularSpeed: 120
-  m_StoppingDistance: 2
+  m_StoppingDistance: 4
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1
@@ -136,13 +136,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   attackRange: 23.1
   attackDamage: 5
+  hordeLimit: 5
   surroundedRange: 5.1
   surroundedThreshold: 4
   fleeDistance: 7.06
+  speed: 10
   rotationSpeed: 5
   reactionTime: 0.5
-  hordeLimit: 5
-  enemiesSurrounding: []
+  allyToHelp: {fileID: 0}
+  destination: {x: 0, y: 0, z: 0}
+  hordeStatus: 0
+  onDefensivePosition: 1
 --- !u!54 &5459260421097882171
 Rigidbody:
   m_ObjectHideFlags: 0
