@@ -11,7 +11,7 @@ public class DefenderFSM : MonoBehaviour
     [Range(1, 100)]    public float attackRange = 10f;
     [Range(1, 100)]    public float attackDamage = 5f;
     [Header("Hordes")]
-    [Range(1, 100)]    public int hordeLimit = 5;
+    [Range(1, 100)]    public int hordeThreshold = 5;
     [Header("Surrounded")]
     [Range(1, 20)]     public float surroundedRange = 5f;
     [Range(1, 20)]     public int surroundedThreshold = 5;
@@ -45,6 +45,7 @@ public class DefenderFSM : MonoBehaviour
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
+        agent.speed = speed;
         fortNavMeshAreaMask = 1 << NavMesh.GetAreaFromName("Fort");
         defenders = GameObject.FindGameObjectsWithTag("Defender");
         defensivePositions = GameObject.FindGameObjectsWithTag("DefensivePosition");
@@ -71,19 +72,22 @@ public class DefenderFSM : MonoBehaviour
 
         //to attack outside fort
         hasATarget.AddLink(false, acquireTarget);
-        hasATarget.AddLink(true, isInRange);
+        hasATarget.AddLink(true, isTargetAlive);
+        
         //to attack inside fort
-        hasATargetInsideFort.AddLink(true, isInRange);
+        hasATargetInsideFort.AddLink(true, isTargetAlive);
         hasATargetInsideFort.AddLink(false, acquireTargetInsideFort);
+
+        isTargetAlive.AddLink(false, releaseTargetDtAction);
+        isTargetAlive.AddLink(true, isInRange);
 
         isInRange.AddLink(false, releaseTargetDtAction);
         isInRange.AddLink(true, isTargetInsSight);
 
         isTargetInsSight.AddLink(false, releaseTargetDtAction);
-        isTargetInsSight.AddLink(true, isTargetAlive);
+        isTargetInsSight.AddLink(true, attack);
 
-        isTargetAlive.AddLink(false, releaseTargetDtAction);
-        isTargetAlive.AddLink(true, attack);
+        
 
         DecisionTree attackDt = new DecisionTree(hasATarget);
         DecisionTree attackInsideFortDt = new DecisionTree(hasATargetInsideFort);
@@ -110,7 +114,7 @@ public class DefenderFSM : MonoBehaviour
         #region Attack after arriving on destination DT
         DTDecision hasArrivedToDestination = new DTDecision(ArrivedToDestination);
         //the rest is up to attackEnemyInsideFort subtree (root = hasATargetInsideFort)
-        hasArrivedToDestination.AddLink(true, hasATargetInsideFort);
+        hasArrivedToDestination.AddLink(true, hasATarget);
 
         DecisionTree helpWithHordeDt = new DecisionTree(hasArrivedToDestination); 
         #endregion
@@ -126,25 +130,24 @@ public class DefenderFSM : MonoBehaviour
 
         //FSM states
         HFSMState attackFromWalls = new HFSMState();
-        attackFromWalls.stayActions = new List<FSMAction> {acquireTargetFSMAction, attackTarget, SeekHelpFromAllies };
-        attackFromWalls.exitActions = new List<FSMAction> { releaseTarget, resetAgentPath };
+        attackFromWalls.stayActions = new List<FSMAction> {attackTarget, SeekHelpFromAllies };
+        attackFromWalls.exitActions = new List<FSMAction> { releaseTarget, resetAgentPath, () => isAnAllyHelping = false };
 
         HFSMState returnToDefPos = new HFSMState();
         returnToDefPos.enterActions = new List<FSMAction> { FindAnEmptyDefensivePosition, MoveToDestination };
-        returnToDefPos.exitActions.Add(resetAgentPath);
 
         HFSMState hordeHelp = new HFSMState();
-        hordeHelp.enterActions = new List<FSMAction>{ setAllyToHelpAsDestination, SetAgentDestination };
-        hordeHelp.stayActions = new List<FSMAction>{ acquireTargetFSMAction, helpWithHordeAction };
+        hordeHelp.enterActions = new List<FSMAction>{ setAllyToHelpAsDestination, MoveToDestination };
+        hordeHelp.stayActions = new List<FSMAction>{ helpWithHordeAction };
         hordeHelp.exitActions = new List<FSMAction>{ releaseTarget, resetAllyToHelp, resetAgentPath };
 
         HFSMState defendYard = new HFSMState();
-        defendYard.enterActions.Add(resetAgentPath);
         defendYard.stayActions = new List<FSMAction>() {() => attackInsideFortDt.walk() };
         defendYard.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp };
 
         HFSMState flee = new HFSMState();
         flee.enterActions.Add(() => agent.autoBraking = false);
+
         flee.stayActions.Add(Flee);
         flee.exitActions.Add(() => agent.autoBraking = true);
 
@@ -183,28 +186,26 @@ public class DefenderFSM : MonoBehaviour
 
         returnToDefPos.AddTransition(insideDefPos, attackFromWalls);
 
-        returnToDefPos2.AddTransition(insideDefPos, defendYard);
-        returnToDefPos2.AddTransition(surrounded, flee);
-
-        surroundedAllyHelp.AddTransition(surrounded, flee);
         surroundedAllyHelp.AddTransition(allyToHelpIsClear, defendYard);
-
-        flee.AddTransition(clear, defendYard);
-
         defendYard.AddTransition(canHelpSurroundedAlly, surroundedAllyHelp);
-        defendYard.AddTransition(surrounded, flee);
-        defendYard.AddTransition(outsideDefPos, returnToDefPos2);
 
         //SubMachines
         SubMachineState defendWallsSubMachineState = new SubMachineState(attackFromWalls);
-        SubMachineState defendYardSubMachineState = new SubMachineState(defendYard);
+        SubMachineState attackEnemiesInsideFortSubMachineState = new SubMachineState(defendYard);
 
+        SubMachineState defendYardSubMachineState = new SubMachineState(attackEnemiesInsideFortSubMachineState);
 
         defendWallsSubMachineState.AddTransition(fortInvaded, defendYardSubMachineState);
-
         defendYardSubMachineState.AddTransition(fortClear, defendWallsSubMachineState);
 
+        flee.AddTransition(clear, attackEnemiesInsideFortSubMachineState);
+        attackEnemiesInsideFortSubMachineState.AddTransition(surrounded, flee);
+
         defendWallsSubMachineState.me.stayActions.Add(UpdateHordeStatus);
+
+        defendYardSubMachineState.me.enterActions.Add(FindAnEmptyDefensivePosition);
+        defendYardSubMachineState.me.enterActions.Add(MoveToDestination);
+
         defendYardSubMachineState.me.stayActions.Add(UpdateSurroundingEnemies);
 
         fsm = new SubMachineState(defendWallsSubMachineState);
@@ -268,6 +269,8 @@ public class DefenderFSM : MonoBehaviour
     private void MoveToDestination()
     {
         agent.SetDestination(destination);
+        agent.isStopped = false;
+
     }
     private object ArrivedToDestination(object bundle)
     {
@@ -314,6 +317,7 @@ public class DefenderFSM : MonoBehaviour
             if (NavMesh.SamplePosition(enemy.transform.position, out hit, 0.001f, fortNavMeshAreaMask))
             {
                 target = enemy.gameObject;
+                if (agent.hasPath) agent.ResetPath();
                 return true;
             }
         }
@@ -375,7 +379,7 @@ public class DefenderFSM : MonoBehaviour
     #region Horde methods
     private void UpdateHordeStatus()
     {
-        hordeStatus = enemiesInRange != null && enemiesInRange.Length > hordeLimit;
+        hordeStatus = enemiesInRange != null && enemiesInRange.Length > hordeThreshold;
     }
 
 

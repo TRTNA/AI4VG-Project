@@ -722,6 +722,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 5459260421097882164, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: _health
+      value: 1000
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882165, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_RootOrder
       value: 11
@@ -769,6 +773,14 @@ PrefabInstance:
     - target: {fileID: 5459260421097882169, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_StoppingDistance
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: speed
+      value: 5.68
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: fleeDistance
+      value: 6.43
       objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name
@@ -1753,7 +1765,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -2551,7 +2563,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -3925,7 +3937,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -5968,7 +5980,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -6892,7 +6904,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -7468,7 +7480,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1432745995}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 6.7333336, y: 0, z: 0}
+  m_LocalPosition: {x: 6.7333336, y: 0, z: -0.241}
   m_LocalScale: {x: 8.758692, y: 3.4117, z: 0.62559164}
   m_Children: []
   m_Father: {fileID: 368455744}
@@ -7560,7 +7572,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d9117b4e9329c14da90eb1e783765ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _health: 50
+  _health: 1000
 --- !u!4 &1438685458 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4437459323509006, guid: 0de8a3d472546b04aa775e83b052764e, type: 3}
@@ -7998,7 +8010,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -8605,6 +8617,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 5459260421097882164, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: _health
+      value: 1000
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882165, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_RootOrder
       value: 10
@@ -8652,6 +8668,14 @@ PrefabInstance:
     - target: {fileID: 5459260421097882169, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_StoppingDistance
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: speed
+      value: 5.68
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: fleeDistance
+      value: 6.43
       objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name
@@ -9666,7 +9690,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -10259,7 +10283,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -10325,7 +10349,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 330500823846571630, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7217662277459495547, guid: f198d14b10c72fa499f7c60b17fbc603, type: 3}
       propertyPath: m_RootOrder
@@ -10743,6 +10767,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 5459260421097882164, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: _health
+      value: 1000
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882165, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_RootOrder
       value: 4
@@ -10791,6 +10819,14 @@ PrefabInstance:
       propertyPath: m_StoppingDistance
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: speed
+      value: 5.68
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: fleeDistance
+      value: 6.43
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name
       value: Defender (1)
@@ -10804,6 +10840,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 5459260421097882164, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: _health
+      value: 1000
+      objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882165, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_RootOrder
       value: 9
@@ -10851,6 +10891,14 @@ PrefabInstance:
     - target: {fileID: 5459260421097882169, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_StoppingDistance
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: speed
+      value: 5.68
+      objectReference: {fileID: 0}
+    - target: {fileID: 5459260421097882170, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
+      propertyPath: fleeDistance
+      value: 6.43
       objectReference: {fileID: 0}
     - target: {fileID: 5459260421097882172, guid: cd174ddb8be583548b375eb2e20c1f2a, type: 3}
       propertyPath: m_Name

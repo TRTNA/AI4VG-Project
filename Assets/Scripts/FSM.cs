@@ -100,18 +100,16 @@ public class FSM {
 
 public interface IFSMState
 {
-    public void AddTransition(FSMTransition transition, IFSMState target);
+    //Acts like a state
+    void AddTransition(FSMTransition transition, IFSMState target);
+    FSMTransition VerifyTransitions();
+    IFSMState NextState(FSMTransition t);
+    void Enter(); 
+    void Stay();
+    void Exit();
 
-    public FSMTransition VerifyTransitions();
-
-    public IFSMState NextState(FSMTransition t);
-
-    // These methods will perform the actions in each list
-    public void Enter();
-    public void Stay();
-    public void Exit();
-
-    public void Update();
+    //Acts like an FSM
+    void Update();
 }
 
 public class HFSMState : IFSMState
@@ -193,6 +191,7 @@ public class SubMachineState : IFSMState
             current.Enter();
             return;
         }
+        me.Enter();
         initial.Enter();
         return;
     }
@@ -217,14 +216,14 @@ public class SubMachineState : IFSMState
     {
         FSMTransition transition = current.VerifyTransitions();
 		if (transition != null) {
-			current.Exit();		// 1
-			transition.Fire();	// 2
-			current = current.NextState(transition);	// 3
-			current.Enter();	// 4
+			current.Exit();		
+			transition.Fire();	
+			current = current.NextState(transition);
+			current.Enter();	
 		} else
         {
             current.Update();
-			current.Stay();		// 5
+			current.Stay();	
 		}
     }
 
