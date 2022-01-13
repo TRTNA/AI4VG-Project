@@ -105,7 +105,7 @@ public class DefenderFSM : MonoBehaviour
         isAllyToHelpTooFarD.AddLink(true, getCloseToAllyD);
         isAllyToHelpTooFarD.AddLink(false, hasATargetSurroundingAlly);
 
-        hasATargetSurroundingAlly.AddLink(true, isInRange);
+        hasATargetSurroundingAlly.AddLink(true, isTargetAlive);
         hasATargetSurroundingAlly.AddLink(false, pickEnemySurroundingAlly);
 
         DecisionTree helpSurroundedAllyDt = new DecisionTree(hasAllyToHelpD);
@@ -243,10 +243,6 @@ public class DefenderFSM : MonoBehaviour
 
     #region Moving methods
 
-    private void SetAgentDestination()
-    {
-        agent.SetDestination(destination);
-    }
 
     private bool IsOutsideDefensivePosition()
     {
@@ -297,7 +293,6 @@ public class DefenderFSM : MonoBehaviour
     {
         if (enemiesInRange == null)
         {
-            Debug.LogWarning("Enemies scanning must be run BEFORE picking an enemy");
             return false;
         }
         target = enemiesInRange.Length != 0 ? enemiesInRange[0] : null;
@@ -308,7 +303,6 @@ public class DefenderFSM : MonoBehaviour
     {
         if (enemiesInRange == null)
         {
-            Debug.LogWarning("Enemies scanning must be run BEFORE picking an enemy");
             return false;
         }
         NavMeshHit hit;
@@ -427,7 +421,6 @@ public class DefenderFSM : MonoBehaviour
         Vector3 directionTowardAlly = (allyToHelp.transform.position - transform.position);
         Vector3 tempDestination = transform.position + directionTowardAlly / 2;
         return agent.SetDestination(tempDestination);
-
     }
     private GameObject[] GetSurroundedAllies()
     {
@@ -451,7 +444,7 @@ public class DefenderFSM : MonoBehaviour
 
         Vector3 fleeDirection = (-1 * GetAverageEnemiesDirection(surroundingEnemies)).normalized;
         NavMeshHit hit;
-        float[] rotationValues = { 0, -10, 30, -90, 90, 180 };
+        float[] rotationValues = { 0, -10, 10, -30,  30, -90, 90, 180 };
         foreach (var rotationValue in rotationValues)
         {
             Vector3 dir = transform.position + Quaternion.Euler(0, rotationValue, 0) * fleeDirection * fleeDistance;
@@ -463,7 +456,6 @@ public class DefenderFSM : MonoBehaviour
             }
         }
         agent.SetDestination(Vector3.zero);
-
     }
 
     private Vector3 GetAverageEnemiesDirection(GameObject[] enemies)
