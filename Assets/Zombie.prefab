@@ -119,14 +119,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   reactionTime: 1
-  walkSpeed: 3
-  runSpeed: 3
-  interactionRange: 5
-  damage: 1
-  constrainedAreaTag: Yard
-  navMeshAreaName: Fort
-  circleForwardOffset: 5
-  circleRay: 5
+  speed: 2
+  attackDamage: 10
+  attackRange: 5
+  target: {fileID: 0}
 --- !u!136 &979602514836018303
 CapsuleCollider:
   m_ObjectHideFlags: 0

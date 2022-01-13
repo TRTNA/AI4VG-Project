@@ -130,35 +130,60 @@ public class DefenderFSM : MonoBehaviour
 
         //FSM states
         HFSMState attackFromWalls = new HFSMState();
+
         attackFromWalls.stayActions = new List<FSMAction> {attackTarget, SeekHelpFromAllies };
+        attackFromWalls.enterActions.Add(() => Debug.Log(gameObject.name + "Entering attack from walls"));
+
         attackFromWalls.exitActions = new List<FSMAction> { releaseTarget, resetAgentPath, () => isAnAllyHelping = false };
+        attackFromWalls.exitActions.Add(() => Debug.Log(gameObject.name + "exiting attack from walls"));
+
 
         HFSMState returnToDefPos = new HFSMState();
+
         returnToDefPos.enterActions = new List<FSMAction> { FindAnEmptyDefensivePosition, MoveToDestination };
+        returnToDefPos.enterActions.Add(() => Debug.Log(gameObject.name + "entering returnToDefPos"));
+        returnToDefPos.stayActions.Add(() =>
+        {
+            if (agent.pathPending) Debug.Log(gameObject.name + " path is pending...");
+        });
+        returnToDefPos.exitActions.Add(() => Debug.Log(gameObject.name + "exiting returnToDefPos"));
 
         HFSMState hordeHelp = new HFSMState();
+
         hordeHelp.enterActions = new List<FSMAction>{ setAllyToHelpAsDestination, MoveToDestination };
+        hordeHelp.enterActions.Add(() => Debug.Log(gameObject.name + "entering hordeHelp"));
+
         hordeHelp.stayActions = new List<FSMAction>{ helpWithHordeAction };
         hordeHelp.exitActions = new List<FSMAction>{ releaseTarget, resetAllyToHelp, resetAgentPath };
+        hordeHelp.exitActions.Add(() => Debug.Log(gameObject.name + "exiting hordeHelp"));
+
 
         HFSMState defendYard = new HFSMState();
+        defendYard.enterActions.Add(() => Debug.Log(gameObject.name + "entering defendYard"));
+
         defendYard.stayActions = new List<FSMAction>() {() => attackInsideFortDt.walk() };
         defendYard.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp };
+        defendYard.exitActions.Add(() => Debug.Log(gameObject.name + "exiting defendYard"));
 
         HFSMState flee = new HFSMState();
+
         flee.enterActions.Add(() => agent.autoBraking = false);
+        flee.enterActions.Add(() => Debug.Log(gameObject.name + "entering flee"));
 
         flee.stayActions.Add(Flee);
         flee.exitActions.Add(() => agent.autoBraking = true);
+        flee.exitActions.Add(() => Debug.Log(gameObject.name + "exiting flee"));
+
 
         HFSMState surroundedAllyHelp = new HFSMState();
+        surroundedAllyHelp.enterActions.Add(() => Debug.Log(gameObject.name + "entering surroundedAllyHelp"));
+
         surroundedAllyHelp.enterActions.Add(() => allyToHelp = Utils.GetNearestObject(transform.position, GetSurroundedAllies()));
         surroundedAllyHelp.stayActions = new List<FSMAction> {() => helpSurroundedAllyDt.walk() };
         surroundedAllyHelp.exitActions.Add(resetAllyToHelp);
+        surroundedAllyHelp.exitActions.Add(() => Debug.Log(gameObject.name + "exiting surroundedAllyHelp"));
 
-        HFSMState returnToDefPos2 = new HFSMState();
-        returnToDefPos2.enterActions = new List<FSMAction> {FindAnEmptyDefensivePosition, MoveToDestination };
-        returnToDefPos2.exitActions.Add(resetAgentPath);
+
 
         //FSM conditions
         FSMCondition isFortInvaded = new FSMCondition(() => !IsFortClear());
@@ -190,7 +215,7 @@ public class DefenderFSM : MonoBehaviour
         defendYard.AddTransition(canHelpSurroundedAlly, surroundedAllyHelp);
 
         //SubMachines
-        SubMachineState defendWallsSubMachineState = new SubMachineState(attackFromWalls);
+        SubMachineState defendWallsSubMachineState = new SubMachineState(returnToDefPos);
         SubMachineState attackEnemiesInsideFortSubMachineState = new SubMachineState(defendYard);
 
         SubMachineState defendYardSubMachineState = new SubMachineState(attackEnemiesInsideFortSubMachineState);
@@ -270,7 +295,7 @@ public class DefenderFSM : MonoBehaviour
     }
     private object ArrivedToDestination(object bundle)
     {
-        return Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f;
+        return Vector3.Distance(transform.position, agent.destination) <= agent.stoppingDistance + 0.1f;
     }
 
 
@@ -344,7 +369,8 @@ public class DefenderFSM : MonoBehaviour
     {
         if (target == null) return false;
         RaycastHit hit;
-        return Physics.Linecast(transform.position, target.transform.position, out hit) && hit.collider.gameObject.CompareTag("Attacker");
+        //attacker prefab has center of gravity shifted on the y-axis.
+        return Physics.Linecast(transform.position, target.transform.position + 1.5f*Vector3.up, out hit) && hit.collider.gameObject.CompareTag("Attacker");
     }
 
     private object IsTargetAlive(object bundle)
@@ -359,7 +385,7 @@ public class DefenderFSM : MonoBehaviour
         if (target == null) return true;
         if (!target.TryGetComponent<HealthController>(out hc)) return false;
         hc.TakeDamage(attackDamage);
-        Debug.DrawLine(transform.position, target.transform.position, Color.red, 0.5f);
+        Debug.DrawLine(transform.position, target.transform.position + 1.5f * Vector3.up, Color.red, 0.5f);
         return true;
     }
     private object ReleaseTarget(object bundle)
@@ -442,13 +468,16 @@ public class DefenderFSM : MonoBehaviour
     {
         if (surroundingEnemies == null || surroundingEnemies.Length == 0) return;
 
-        Vector3 fleeDirection = (-1 * GetAverageEnemiesDirection(surroundingEnemies)).normalized;
+        Vector3 fleeDirection = GetAverageEnemiesDirection(surroundingEnemies);
         NavMeshHit hit;
         float[] rotationValues = { 0, -10, 10, -30,  30, -90, 90, 180 };
         foreach (var rotationValue in rotationValues)
         {
-            Vector3 dir = transform.position + Quaternion.Euler(0, rotationValue, 0) * fleeDirection * fleeDistance;
-            if (NavMesh.SamplePosition(dir, out hit, 5f, fortNavMeshAreaMask))
+
+            Vector3 fleeDestination = transform.position + Quaternion.Euler(0, rotationValue, 0) * fleeDirection * fleeDistance;
+            Debug.DrawLine(transform.position, fleeDestination, Color.black, 5f);
+
+            if (NavMesh.SamplePosition(fleeDestination, out hit, 3f, fortNavMeshAreaMask))
             {
                 Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
                 agent.SetDestination(hit.position);
@@ -465,14 +494,12 @@ public class DefenderFSM : MonoBehaviour
         {
             if (enemy != null)
             {
-                Vector3 dir = Vector3.ProjectOnPlane(enemy.transform.position - transform.position, Vector3.up);
+                Vector3 dir = Vector3.ProjectOnPlane(transform.position - enemy.transform.position, Vector3.up);
                 averageEnemiesDirection += dir;
             }
             
         }
-
-        averageEnemiesDirection /= enemies.Length;
-        return averageEnemiesDirection;
+        return averageEnemiesDirection.normalized;
     }
 
 
@@ -514,7 +541,7 @@ public class DefenderFSM : MonoBehaviour
         if (other.CompareTag("DefensivePosition"))
         {
             var dp = other.gameObject.GetComponent<DefensivePosition>();
-            if (!dp.IsOccupied())
+            if (!dp.IsOccupied() || dp.OccupiedBy() == gameObject)
             {
                 onDefensivePosition = true;
             }
