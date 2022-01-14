@@ -110,11 +110,11 @@ NavMeshAgent:
   m_Enabled: 1
   m_AgentTypeID: 0
   m_Radius: 0.5
-  m_Speed: 6
-  m_Acceleration: 8
+  m_Speed: 8
+  m_Acceleration: 5
   avoidancePriority: 50
-  m_AngularSpeed: 120
-  m_StoppingDistance: 4
+  m_AngularSpeed: 80
+  m_StoppingDistance: 2
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1
@@ -134,14 +134,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11de167a8db0f6e45b007f432b72fd4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 23.1
-  attackDamage: 5
-  hordeLimit: 5
-  surroundedRange: 5.1
+  attackRange: 25
+  attackDamage: 10
+  hordeThreshold: 8
+  surroundedRange: 5
   surroundedThreshold: 4
-  fleeDistance: 7.06
-  speed: 10
-  rotationSpeed: 5
+  fleeDistance: 7
+  speed: 8.1
+  rotationSpeed: 4.33
   reactionTime: 0.5
   allyToHelp: {fileID: 0}
   destination: {x: 0, y: 0, z: 0}
@@ -175,4 +175,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d9117b4e9329c14da90eb1e783765ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _health: 50
+  health: 400
+  lastAttackExpiration: 3
+  attackedBy: {fileID: 0}

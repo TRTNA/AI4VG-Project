@@ -9,14 +9,9 @@ public class Gate : MonoBehaviour, IObserver
 
     public void OnNotify(GameObject subject, object status)
     {
-        if (status.GetType() == typeof(int) && (int)status == 0)
-        {
-            Debug.Log("notifying to " + gameObject.name + " that health is 0");
-            isOpen = true;
-            //temporary
-            gameObject.GetComponent<MeshRenderer>().enabled = false;
-            gameObject.GetComponent<BoxCollider>().enabled = false;
-        }
+        isOpen = true;
+        gameObject.GetComponent<MeshRenderer>().enabled = false;
+        gameObject.GetComponent<BoxCollider>().enabled = false;
     }
 
     // Start is called before the first frame update
@@ -28,11 +23,6 @@ public class Gate : MonoBehaviour, IObserver
     public bool IsOpen()
     {
         return isOpen;
-    }
-
-    private void OnBreached()
-    {
-        isOpen = true;
     }
 
 }

@@ -2,19 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class AttackersSpawner : MonoBehaviour
+public class Spawner : MonoBehaviour
 {
-    public Transform toSpawn;
+    public GameObject toSpawn;
     [Range(1, 100)]
     public int unitsAvailable = 10;
-    [Range(1, 10)]
-    public int spawnCooldown = 2; //TODO: possibile feature, diminuire cooldown verso fine partita?
+    [Range(0.1f, 10f)]
+    public float spawnCooldown = 0.5f; 
     [Range(1, 10)]
     public float yOffset = 1;
     private bool canSpawn = true;
-    private Vector3 attackerDirectionAtSpawn = Vector3.zero;
 
-    // Update is called once per frame
     void Update()
     {
         
@@ -27,7 +25,7 @@ public class AttackersSpawner : MonoBehaviour
                 canSpawn = false;
                 unitsAvailable--;
                 Quaternion direction = Quaternion.identity;
-                direction.SetLookRotation(attackerDirectionAtSpawn - hit.point, Vector3.up);
+                direction.SetLookRotation(Vector3.zero - hit.point, Vector3.up);
                 Instantiate(toSpawn, new Vector3(hit.point.x, hit.point.y + yOffset, hit.point.z), direction);
                 StartCoroutine(SpawnCooldown());
             }

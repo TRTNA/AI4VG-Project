@@ -6,7 +6,7 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
 [RequireComponent(typeof(HealthController))]
-public class AttackerFSM : MonoBehaviour
+public class AttackerBehaviour : MonoBehaviour
 {
     [Header("FSM settings")]
     [Range(0.1f, 5f)]
@@ -125,7 +125,7 @@ public class AttackerFSM : MonoBehaviour
     private object MoveToDestination(object bundle)
     {
         anim.Play("Base Layer.Run");
-        return agent.SetDestination(destination);
+        return agent.isActiveAndEnabled && agent.SetDestination(destination);
     }
 
 
@@ -161,7 +161,7 @@ public class AttackerFSM : MonoBehaviour
         if (target == null || ! target.TryGetComponent<HealthController>(out var hc)) return false;
 
         anim.Play("Base Layer.Attack");
-        hc.TakeDamage(attackDamage);
+        hc.TakeDamage(attackDamage, gameObject);
         if (hc.Health != 0) return true;
         target = null;
         return false;
@@ -185,6 +185,7 @@ public class AttackerFSM : MonoBehaviour
 
     private void OnKilled()
     {
+
         Destroy(gameObject);
     }
 }

@@ -5,27 +5,23 @@ using UnityEngine;
 public class HealthController : Target, ISubject
 {
     public List<IObserver> observers = new List<IObserver>(); 
-    public float _health = 100f;
-    private float health = 100f;
+    public float health = 100f;
     private OnHealthDroppedToZero onHealthDroppedToZero;
 
     public float Health
     {
-        get
-        {
-            return _health;
-        }
+        get => health;
         set
         {
             if (value <= 0)
             {
-                _health = 0;
+                health = 0;
                 Notify();
                 observers.Clear();
                 onHealthDroppedToZero?.Invoke();
             } else
             {
-                _health = value;
+                health = value;
             }
         }
     }
@@ -37,10 +33,11 @@ public class HealthController : Target, ISubject
     }
 
 
-    public override void TakeDamage(float damage)
+    public override void TakeDamage(float damage, GameObject attacker)
     {
         Health -= damage;
     }
+
 
     public void SetOnHealthDroppedToZero(OnHealthDroppedToZero callback)
     {
@@ -52,7 +49,7 @@ public class HealthController : Target, ISubject
 
     public void Notify()
     {
-        //shallow copy of list to allow called observers to remove theirsevlves inside the OnNotify method
+        //shallow copy of list to allow called observers to remove themselves inside the OnNotify method
         foreach (IObserver observer in new List<IObserver>(observers))
         {
             observer.OnNotify(gameObject, 0);

@@ -5,7 +5,7 @@ using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(HealthController))]
-public class DefenderFSM : MonoBehaviour
+public class DefenderBehaviour : MonoBehaviour
 {
     [Header("Attacking")]
     [Range(1, 100)]    public float attackRange = 10f;
@@ -28,6 +28,8 @@ public class DefenderFSM : MonoBehaviour
     private GameObject[] defensivePositions;
     private GameObject[] defenders;
 
+    private Collider[] colliders = new Collider[100];
+
     private GameObject target;
     public GameObject allyToHelp;
 
@@ -40,6 +42,8 @@ public class DefenderFSM : MonoBehaviour
     public bool hordeStatus;
     private bool isAnAllyHelping;
     public bool onDefensivePosition = true;
+    private int attackerLayerMask;
+    private HealthController hc;
 
     // Start is called before the first frame update
     void Start()
@@ -47,16 +51,19 @@ public class DefenderFSM : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         agent.speed = speed;
         fortNavMeshAreaMask = 1 << NavMesh.GetAreaFromName("Fort");
+        attackerLayerMask = 1 << LayerMask.NameToLayer("Attacker");
         defenders = GameObject.FindGameObjectsWithTag("Defender");
         defensivePositions = GameObject.FindGameObjectsWithTag("DefensivePosition");
+        hc = GetComponent<HealthController>();
+        //exclude itself from the list of defenders
         List<GameObject> temp = new List<GameObject>();
         foreach (var defender in defenders)
         {
             if (defender != gameObject) temp.Add(defender);
         }
-
         defenders = temp.ToArray();
-        GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
+
+        hc.SetOnHealthDroppedToZero(OnKilled);
 
         //DTs
         #region Attacking (generic and inside fort) DT
@@ -73,10 +80,10 @@ public class DefenderFSM : MonoBehaviour
         //to attack outside fort
         hasATarget.AddLink(false, acquireTarget);
         hasATarget.AddLink(true, isTargetAlive);
-        
+
         //to attack inside fort
-        hasATargetInsideFort.AddLink(true, isTargetAlive);
         hasATargetInsideFort.AddLink(false, acquireTargetInsideFort);
+        hasATargetInsideFort.AddLink(true, isTargetAlive);
 
         isTargetAlive.AddLink(false, releaseTargetDtAction);
         isTargetAlive.AddLink(true, isInRange);
@@ -120,7 +127,6 @@ public class DefenderFSM : MonoBehaviour
         #endregion
 
         //FSM actions
-        FSMAction acquireTargetFSMAction = new FSMAction(() => PickAnEnemy(null));
         FSMAction resetAgentPath = () => agent.ResetPath();
         FSMAction releaseTarget = () => target = null;
         FSMAction setAllyToHelpAsDestination = () => destination = allyToHelp != null ? allyToHelp.transform.position : destination;
@@ -130,29 +136,20 @@ public class DefenderFSM : MonoBehaviour
 
         //FSM states
         HFSMState attackFromWalls = new HFSMState();
-
         attackFromWalls.stayActions = new List<FSMAction> {attackTarget, SeekHelpFromAllies };
         attackFromWalls.enterActions.Add(() => Debug.Log(gameObject.name + "Entering attack from walls"));
-
         attackFromWalls.exitActions = new List<FSMAction> { releaseTarget, resetAgentPath, () => isAnAllyHelping = false };
         attackFromWalls.exitActions.Add(() => Debug.Log(gameObject.name + "exiting attack from walls"));
 
 
         HFSMState returnToDefPos = new HFSMState();
-
         returnToDefPos.enterActions = new List<FSMAction> { FindAnEmptyDefensivePosition, MoveToDestination };
         returnToDefPos.enterActions.Add(() => Debug.Log(gameObject.name + "entering returnToDefPos"));
-        returnToDefPos.stayActions.Add(() =>
-        {
-            if (agent.pathPending) Debug.Log(gameObject.name + " path is pending...");
-        });
         returnToDefPos.exitActions.Add(() => Debug.Log(gameObject.name + "exiting returnToDefPos"));
 
         HFSMState hordeHelp = new HFSMState();
-
         hordeHelp.enterActions = new List<FSMAction>{ setAllyToHelpAsDestination, MoveToDestination };
         hordeHelp.enterActions.Add(() => Debug.Log(gameObject.name + "entering hordeHelp"));
-
         hordeHelp.stayActions = new List<FSMAction>{ helpWithHordeAction };
         hordeHelp.exitActions = new List<FSMAction>{ releaseTarget, resetAllyToHelp, resetAgentPath };
         hordeHelp.exitActions.Add(() => Debug.Log(gameObject.name + "exiting hordeHelp"));
@@ -160,16 +157,13 @@ public class DefenderFSM : MonoBehaviour
 
         HFSMState defendYard = new HFSMState();
         defendYard.enterActions.Add(() => Debug.Log(gameObject.name + "entering defendYard"));
-
         defendYard.stayActions = new List<FSMAction>() {() => attackInsideFortDt.walk() };
         defendYard.exitActions = new List<FSMAction>() { releaseTarget, resetAllyToHelp };
         defendYard.exitActions.Add(() => Debug.Log(gameObject.name + "exiting defendYard"));
 
         HFSMState flee = new HFSMState();
-
         flee.enterActions.Add(() => agent.autoBraking = false);
         flee.enterActions.Add(() => Debug.Log(gameObject.name + "entering flee"));
-
         flee.stayActions.Add(Flee);
         flee.exitActions.Add(() => agent.autoBraking = true);
         flee.exitActions.Add(() => Debug.Log(gameObject.name + "exiting flee"));
@@ -177,13 +171,14 @@ public class DefenderFSM : MonoBehaviour
 
         HFSMState surroundedAllyHelp = new HFSMState();
         surroundedAllyHelp.enterActions.Add(() => Debug.Log(gameObject.name + "entering surroundedAllyHelp"));
-
         surroundedAllyHelp.enterActions.Add(() => allyToHelp = Utils.GetNearestObject(transform.position, GetSurroundedAllies()));
         surroundedAllyHelp.stayActions = new List<FSMAction> {() => helpSurroundedAllyDt.walk() };
+        surroundedAllyHelp.stayActions.Add(() =>
+        {
+            if (agent.pathPending) Debug.Log(gameObject.name + " path is pending...");
+        });
         surroundedAllyHelp.exitActions.Add(resetAllyToHelp);
         surroundedAllyHelp.exitActions.Add(() => Debug.Log(gameObject.name + "exiting surroundedAllyHelp"));
-
-
 
         //FSM conditions
         FSMCondition isFortInvaded = new FSMCondition(() => !IsFortClear());
@@ -217,54 +212,27 @@ public class DefenderFSM : MonoBehaviour
         //SubMachines
         SubMachineState defendWallsSubMachineState = new SubMachineState(returnToDefPos);
         SubMachineState attackEnemiesInsideFortSubMachineState = new SubMachineState(defendYard);
-
         SubMachineState defendYardSubMachineState = new SubMachineState(attackEnemiesInsideFortSubMachineState);
 
         defendWallsSubMachineState.AddTransition(fortInvaded, defendYardSubMachineState);
         defendYardSubMachineState.AddTransition(fortClear, defendWallsSubMachineState);
-
         flee.AddTransition(clear, attackEnemiesInsideFortSubMachineState);
         attackEnemiesInsideFortSubMachineState.AddTransition(surrounded, flee);
 
-        defendWallsSubMachineState.me.stayActions.Add(UpdateHordeStatus);
-
-        defendYardSubMachineState.me.enterActions.Add(FindAnEmptyDefensivePosition);
-        defendYardSubMachineState.me.enterActions.Add(MoveToDestination);
-
-        defendYardSubMachineState.me.stayActions.Add(UpdateSurroundingEnemies);
+        defendWallsSubMachineState.selfState.stayActions.Add(UpdateHordeStatus);
+        defendYardSubMachineState.selfState.enterActions.Add(FindAnEmptyDefensivePosition);
+        defendYardSubMachineState.selfState.enterActions.Add(MoveToDestination);
+        defendYardSubMachineState.selfState.stayActions.Add(UpdateSurroundingEnemies);
 
         fsm = new SubMachineState(defendWallsSubMachineState);
 
         StartCoroutine(UpdateFsm());
     }
 
-    public GameObject[] GetSurroundingEnemies()
-    {
-        return surroundingEnemies;
-    }
+    
 
-    public void UpdateSurroundingEnemies()
-    {
-        List<GameObject> temp = new List<GameObject>();
-        foreach (var enemy in enemiesInRange)
-        {
-            if (enemy != null &&
-                Vector3.Distance(transform.position, enemy.transform.position) < surroundedRange) temp.Add(enemy);
-        }
-        surroundingEnemies = temp.ToArray();
-    }
-    public bool HasHorde() { return hordeStatus; }
 
-    public bool AmISurrounded()
-    {
-        return surroundingEnemies != null && surroundingEnemies.Length >= surroundedThreshold;
-    }
-
-    public bool AmIClear()
-    {
-        //i'm both not surrounded and arrived at my flee destination
-        return !AmISurrounded() && Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f;
-    }
+   
 
     #region Moving methods
 
@@ -304,15 +272,13 @@ public class DefenderFSM : MonoBehaviour
     #region Target selection methods
     private GameObject[] ScanForEnemies()
     {
-        List<GameObject> temp = new List<GameObject>();
-        Collider[] enemies = Physics.OverlapSphere(transform.position, attackRange);
-
-        foreach (var enemy in enemies)
+        int count = Physics.OverlapSphereNonAlloc(transform.position, attackRange, colliders, attackerLayerMask);
+        GameObject[] temp = new GameObject[count];
+        for (int i = 0; i < count; i++)
         {
-            if (enemy.gameObject.CompareTag("Attacker")) temp.Add(enemy.gameObject);
+            temp[i] = colliders[i].gameObject;
         }
-
-        return temp.ToArray();
+        return temp;
     }
     private object PickAnEnemy(object bundle)
     {
@@ -326,17 +292,13 @@ public class DefenderFSM : MonoBehaviour
 
     private object PickAnEnemyInsideFort(object bundle)
     {
-        if (enemiesInRange == null)
-        {
-            return false;
-        }
+        if (enemiesInRange == null) { return false;}
         NavMeshHit hit;
-        foreach (var enemy in enemiesInRange)
+        foreach (var enemy in Utils.SortByDistance(transform.position, enemiesInRange))
         {
             if (NavMesh.SamplePosition(enemy.transform.position, out hit, 0.001f, fortNavMeshAreaMask))
             {
                 target = enemy.gameObject;
-                if (agent.hasPath) agent.ResetPath();
                 return true;
             }
         }
@@ -345,7 +307,7 @@ public class DefenderFSM : MonoBehaviour
 
     private bool PickEnemyWhoIsSurroundingAlly()
     {
-        GameObject[] enemiesSurroundingAlly = allyToHelp.GetComponent<DefenderFSM>().GetSurroundingEnemies();
+        GameObject[] enemiesSurroundingAlly = allyToHelp.GetComponent<DefenderBehaviour>().GetSurroundingEnemies();
         if (enemiesSurroundingAlly == null || enemiesSurroundingAlly.Length == 0) return false;
         target = enemiesSurroundingAlly[0];
         return true;
@@ -370,7 +332,7 @@ public class DefenderFSM : MonoBehaviour
         if (target == null) return false;
         RaycastHit hit;
         //attacker prefab has center of gravity shifted on the y-axis.
-        return Physics.Linecast(transform.position, target.transform.position + 1.5f*Vector3.up, out hit) && hit.collider.gameObject.CompareTag("Attacker");
+        return ! Physics.Linecast(transform.position, target.transform.position + 1.5f * Vector3.up, out hit, ~attackerLayerMask);
     }
 
     private object IsTargetAlive(object bundle)
@@ -384,7 +346,7 @@ public class DefenderFSM : MonoBehaviour
         HealthController hc;
         if (target == null) return true;
         if (!target.TryGetComponent<HealthController>(out hc)) return false;
-        hc.TakeDamage(attackDamage);
+        hc.TakeDamage(attackDamage, gameObject);
         Debug.DrawLine(transform.position, target.transform.position + 1.5f * Vector3.up, Color.red, 0.5f);
         return true;
     }
@@ -397,6 +359,8 @@ public class DefenderFSM : MonoBehaviour
     #endregion
 
     #region Horde methods
+    public bool HasHorde() { return hordeStatus; }
+
     private void UpdateHordeStatus()
     {
         hordeStatus = enemiesInRange != null && enemiesInRange.Length > hordeThreshold;
@@ -406,7 +370,7 @@ public class DefenderFSM : MonoBehaviour
     private bool HasHordeBeenDestroyed()
     {
         if (allyToHelp == null) return true;
-        return !allyToHelp.GetComponent<DefenderFSM>().HasHorde();
+        return !allyToHelp.GetComponent<DefenderBehaviour>().HasHorde();
     }
 
     private void SeekHelpFromAllies()
@@ -423,9 +387,9 @@ public class DefenderFSM : MonoBehaviour
 
         foreach (var defender in Utils.SortByDistance(transform.position, defenders))
         {
-            if (!defender.GetComponent<DefenderFSM>().HasHorde())
+            if (!defender.GetComponent<DefenderBehaviour>().HasHorde())
             {
-                isAnAllyHelping = defender.GetComponent<DefenderFSM>().CanHelpAllyWithHorde(gameObject);
+                isAnAllyHelping = defender.GetComponent<DefenderBehaviour>().CanHelpAllyWithHorde(gameObject);
                 if (isAnAllyHelping) break;
             }
         }
@@ -443,7 +407,6 @@ public class DefenderFSM : MonoBehaviour
     #region Help surrounded allies methods
     private bool GetCloserToAlly()
     {
-        if (agent.hasPath) return true;
         Vector3 directionTowardAlly = (allyToHelp.transform.position - transform.position);
         Vector3 tempDestination = transform.position + directionTowardAlly / 2;
         return agent.SetDestination(tempDestination);
@@ -453,13 +416,13 @@ public class DefenderFSM : MonoBehaviour
         var surroundedAllies = new List<GameObject>();
         foreach (var ally in defenders)
         {
-            if (ally != null && ally.GetComponent<DefenderFSM>().AmISurrounded()) surroundedAllies.Add(ally);
+            if (ally != null && ally.GetComponent<DefenderBehaviour>().AmISurrounded()) surroundedAllies.Add(ally);
         }
         return surroundedAllies.ToArray();
     }
     private bool IsAllyToHelpClear()
     {
-        return allyToHelp == null || !allyToHelp.GetComponent<DefenderFSM>().AmISurrounded();
+        return allyToHelp == null || !allyToHelp.GetComponent<DefenderBehaviour>().AmISurrounded();
     }
     #endregion
 
@@ -502,7 +465,33 @@ public class DefenderFSM : MonoBehaviour
         return averageEnemiesDirection.normalized;
     }
 
+    public GameObject[] GetSurroundingEnemies()
+    {
+        return surroundingEnemies;
+    }
 
+    public void UpdateSurroundingEnemies()
+    {
+        List<GameObject> temp = new List<GameObject>();
+        foreach (var enemy in enemiesInRange)
+        {
+            if (enemy != null &&
+                Vector3.Distance(transform.position, enemy.transform.position) < surroundedRange) temp.Add(enemy);
+        }
+
+        surroundingEnemies = temp.ToArray();
+    }
+
+    public bool AmISurrounded()
+    {
+        return surroundingEnemies != null && surroundingEnemies.Length >= surroundedThreshold;
+    }
+
+    public bool AmIClear()
+    {
+        //i'm both not surrounded and arrived at my flee destination
+        return !AmISurrounded() && Vector3.Distance(transform.position, agent.destination) < agent.stoppingDistance + 0.01f;
+    }
 
     #endregion
 
@@ -521,7 +510,6 @@ public class DefenderFSM : MonoBehaviour
     }
     private void OnKilled()
     {
-        gameObject.SetActive(false);
         Destroy(gameObject, 1f);
     }
 

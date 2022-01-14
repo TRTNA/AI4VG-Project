@@ -2,19 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(BoxCollider))]
-public class DefensivePosition : MonoBehaviour, ISubject
+[RequireComponent(typeof(Collider))]
+public class DefensivePosition : MonoBehaviour
 {
     [Range(1, 20)]
     public float reservationExpiration = 10f;
-    public GameObject occupiedBy = null;
-    private ISet<IObserver> observers;
-    public GameObject reservedBy = null;
+    private GameObject occupiedBy;
+    private GameObject reservedBy;
 
     public void Start()
     {
-        GetComponent<BoxCollider>().isTrigger = true;
-        observers = new HashSet<IObserver>();
+        GetComponent<Collider>().isTrigger = true;
     }
 
     public bool Reserve(GameObject obj)
@@ -51,7 +49,6 @@ public class DefensivePosition : MonoBehaviour, ISubject
         if (other.CompareTag("Defender"))
         {
             occupiedBy = null;
-            Notify();
         }
     }
 
@@ -61,7 +58,6 @@ public class DefensivePosition : MonoBehaviour, ISubject
         {
             occupiedBy = other.gameObject;
             reservedBy = null;
-            Notify();
         }
     }
 
@@ -71,25 +67,6 @@ public class DefensivePosition : MonoBehaviour, ISubject
         {
             occupiedBy = other.gameObject;
             reservedBy = null;
-            Notify();
         }
-    }
-
-    public void Notify()
-    {
-        foreach (var o in observers)
-        {
-            o.OnNotify(gameObject, occupiedBy != null);
-        }
-    }
-
-    public void AddObserver(IObserver o)
-    {
-        if (o != null) observers.Add(o);
-    }
-
-    public void RemoveObserver(IObserver o)
-    {
-        observers.Remove(o);
     }
 }
