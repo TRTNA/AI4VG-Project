@@ -43,7 +43,7 @@ public class AttackerBehaviour : MonoBehaviour
         breaching.enterActions.Add(FindNearestGate);
         DecisionTree breachingDT = CreateBreachingDecisionTree();
         breaching.stayActions.Add(() => breachingDT.walk());
-        breaching.exitActions.Add(() => target = null);
+        breaching.exitActions = new List<FSMAction>{() => agent.SetDestination(transform.position + transform.forward *5f ), () => target = null};
 
 
         FSMState attacking = new FSMState();

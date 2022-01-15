@@ -23,6 +23,8 @@ public class DefenderBehaviour : MonoBehaviour
     [Header("FSM")]
     [Range(0.1f, 10f)] public float reactionTime = 0.5f;
 
+    public GameObject projectile;
+
     private GameObject[] enemiesInRange;
     private GameObject[] surroundingEnemies;
     private GameObject[] defensivePositions;
@@ -32,18 +34,22 @@ public class DefenderBehaviour : MonoBehaviour
 
     private GameObject target;
     public GameObject allyToHelp;
-
     public Vector3 destination;
 
+    private int attackerLayerMask;
     private int fortNavMeshAreaMask;
+    private float onAreaSamplePositionOffset = 0.001f;
+    private float fleeSamplePositionOffset = 3f;
+
+
     private SubMachineState fsm;
-    private NavMeshAgent agent;
 
     public bool hordeStatus;
     private bool isAnAllyHelping;
     public bool onDefensivePosition = true;
-    private int attackerLayerMask;
+
     private HealthController hc;
+    private NavMeshAgent agent;
 
     // Start is called before the first frame update
     void Start()
@@ -55,6 +61,7 @@ public class DefenderBehaviour : MonoBehaviour
         defenders = GameObject.FindGameObjectsWithTag("Defender");
         defensivePositions = GameObject.FindGameObjectsWithTag("DefensivePosition");
         hc = GetComponent<HealthController>();
+
         //exclude itself from the list of defenders
         List<GameObject> temp = new List<GameObject>();
         foreach (var defender in defenders)
@@ -207,6 +214,7 @@ public class DefenderBehaviour : MonoBehaviour
         returnToDefPos.AddTransition(insideDefPos, attackFromWalls);
 
         surroundedAllyHelp.AddTransition(allyToHelpIsClear, defendYard);
+
         defendYard.AddTransition(canHelpSurroundedAlly, surroundedAllyHelp);
 
         //SubMachines
@@ -214,15 +222,15 @@ public class DefenderBehaviour : MonoBehaviour
         SubMachineState attackEnemiesInsideFortSubMachineState = new SubMachineState(defendYard);
         SubMachineState defendYardSubMachineState = new SubMachineState(attackEnemiesInsideFortSubMachineState);
 
+        defendWallsSubMachineState.selfState.stayActions.Add(UpdateHordeStatus);
+
+        defendYardSubMachineState.selfState.enterActions = new List<FSMAction> { FindAnEmptyDefensivePosition, MoveToDestination };
+        defendYardSubMachineState.selfState.stayActions.Add(UpdateSurroundingEnemies);
+
         defendWallsSubMachineState.AddTransition(fortInvaded, defendYardSubMachineState);
         defendYardSubMachineState.AddTransition(fortClear, defendWallsSubMachineState);
         flee.AddTransition(clear, attackEnemiesInsideFortSubMachineState);
         attackEnemiesInsideFortSubMachineState.AddTransition(surrounded, flee);
-
-        defendWallsSubMachineState.selfState.stayActions.Add(UpdateHordeStatus);
-        defendYardSubMachineState.selfState.enterActions.Add(FindAnEmptyDefensivePosition);
-        defendYardSubMachineState.selfState.enterActions.Add(MoveToDestination);
-        defendYardSubMachineState.selfState.stayActions.Add(UpdateSurroundingEnemies);
 
         fsm = new SubMachineState(defendWallsSubMachineState);
 
@@ -296,7 +304,7 @@ public class DefenderBehaviour : MonoBehaviour
         NavMeshHit hit;
         foreach (var enemy in Utils.SortByDistance(transform.position, enemiesInRange))
         {
-            if (NavMesh.SamplePosition(enemy.transform.position, out hit, 0.001f, fortNavMeshAreaMask))
+            if (NavMesh.SamplePosition(enemy.transform.position, out hit, onAreaSamplePositionOffset, fortNavMeshAreaMask))
             {
                 target = enemy.gameObject;
                 return true;
@@ -347,6 +355,10 @@ public class DefenderBehaviour : MonoBehaviour
         if (target == null) return true;
         if (!target.TryGetComponent<HealthController>(out hc)) return false;
         hc.TakeDamage(attackDamage, gameObject);
+
+        var proj = Instantiate(projectile, transform.position + transform.forward * 3f, transform.rotation);
+        proj.GetComponent<Rigidbody>().AddForce((target.transform.position - transform.position).normalized * 5f);
+
         Debug.DrawLine(transform.position, target.transform.position + 1.5f * Vector3.up, Color.red, 0.5f);
         return true;
     }
@@ -436,13 +448,9 @@ public class DefenderBehaviour : MonoBehaviour
         float[] rotationValues = { 0, -10, 10, -30,  30, -90, 90, 180 };
         foreach (var rotationValue in rotationValues)
         {
-
             Vector3 fleeDestination = transform.position + Quaternion.Euler(0, rotationValue, 0) * fleeDirection * fleeDistance;
-            Debug.DrawLine(transform.position, fleeDestination, Color.black, 5f);
-
-            if (NavMesh.SamplePosition(fleeDestination, out hit, 3f, fortNavMeshAreaMask))
+            if (NavMesh.SamplePosition(fleeDestination, out hit, fleeSamplePositionOffset, fortNavMeshAreaMask))
             {
-                Debug.DrawLine(transform.position, hit.position, Color.green, 5f);
                 agent.SetDestination(hit.position);
                 return;
             }
@@ -501,7 +509,7 @@ public class DefenderBehaviour : MonoBehaviour
         NavMeshHit hit;
         foreach (var attacker in attackers)
         {
-            if (NavMesh.SamplePosition(attacker.transform.position, out hit, 0.01f, fortNavMeshAreaMask))
+            if (NavMesh.SamplePosition(attacker.transform.position, out hit, onAreaSamplePositionOffset, fortNavMeshAreaMask))
             {
                 return false;
             }
@@ -512,6 +520,7 @@ public class DefenderBehaviour : MonoBehaviour
     {
         Destroy(gameObject, 1f);
     }
+
 
     IEnumerator UpdateFsm()
     {

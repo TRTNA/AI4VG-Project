@@ -6,7 +6,20 @@ public class HealthController : Target, ISubject
 {
     public List<IObserver> observers = new List<IObserver>(); 
     public float health = 100f;
+    public Material damagedMaterial;
+
+    private Color baseMaterialColor;
+    private Renderer renderer;
+    private float maxHealth;
     private OnHealthDroppedToZero onHealthDroppedToZero;
+    private bool isPlaying;
+
+    void Start()
+    {
+        maxHealth = health;
+        renderer = GetComponent<Renderer>();
+        baseMaterialColor = renderer.material.color;
+    }
 
     public float Health
     {
@@ -22,6 +35,8 @@ public class HealthController : Target, ISubject
             } else
             {
                 health = value;
+                if (!isPlaying) StartCoroutine(ShowDamages());
+
             }
         }
     }
@@ -47,6 +62,7 @@ public class HealthController : Target, ISubject
         }
     }
 
+
     public void Notify()
     {
         //shallow copy of list to allow called observers to remove themselves inside the OnNotify method
@@ -71,6 +87,33 @@ public class HealthController : Target, ISubject
             observers.Remove(observer);
         }
     }
+
+    IEnumerator ShowDamages()
+    {
+        isPlaying = true;
+        float t = 0f;
+        float incr = 0.1f;
+        while(t < 1f)
+        {
+            gameObject.GetComponent<Renderer>().material.color = Color.Lerp(baseMaterialColor, damagedMaterial.color, t);
+            t += incr;
+            yield return new WaitForSeconds(0.01f);
+        }
+
+        t = 0f;
+        while (t < 1f)
+        {
+            gameObject.GetComponent<Renderer>().material.color = Color.Lerp(damagedMaterial.color, baseMaterialColor, t);
+            t += incr;
+            yield return new WaitForSeconds(0.01f);
+        }
+
+
+        gameObject.GetComponent<Renderer>().material.color = baseMaterialColor;
+        isPlaying = false;
+
+    }
 }
 
 public delegate void OnHealthDroppedToZero();
+

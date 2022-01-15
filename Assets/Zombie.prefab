@@ -106,8 +106,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   health: 100
-  lastAttackExpiration: 3
-  attackedBy: {fileID: 0}
+  damagedMaterial: {fileID: 2100000, guid: 6b07f2a1064004c49be9646447a43b76, type: 2}
 --- !u!114 &1755280981543610473
 MonoBehaviour:
   m_ObjectHideFlags: 0
