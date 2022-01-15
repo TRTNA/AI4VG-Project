@@ -38,7 +38,7 @@ public class DefenderBehaviour : MonoBehaviour
 
     private int attackerLayerMask;
     private int fortNavMeshAreaMask;
-    private float onAreaSamplePositionOffset = 0.001f;
+    private float onAreaSamplePositionOffset = 1f;
     private float fleeSamplePositionOffset = 3f;
 
 
@@ -155,10 +155,10 @@ public class DefenderBehaviour : MonoBehaviour
         returnToDefPos.exitActions.Add(() => Debug.Log(gameObject.name + "exiting returnToDefPos"));
 
         HFSMState hordeHelp = new HFSMState();
-        hordeHelp.enterActions = new List<FSMAction>{ setAllyToHelpAsDestination, MoveToDestination };
+        hordeHelp.enterActions = new List<FSMAction>{ () => agent.stoppingDistance += 8f, setAllyToHelpAsDestination, MoveToDestination };
         hordeHelp.enterActions.Add(() => Debug.Log(gameObject.name + "entering hordeHelp"));
         hordeHelp.stayActions = new List<FSMAction>{ helpWithHordeAction };
-        hordeHelp.exitActions = new List<FSMAction>{ releaseTarget, resetAllyToHelp, resetAgentPath };
+        hordeHelp.exitActions = new List<FSMAction>{ () => agent.stoppingDistance -= 8f, releaseTarget, resetAllyToHelp, resetAgentPath };
         hordeHelp.exitActions.Add(() => Debug.Log(gameObject.name + "exiting hordeHelp"));
 
 
@@ -236,11 +236,6 @@ public class DefenderBehaviour : MonoBehaviour
 
         StartCoroutine(UpdateFsm());
     }
-
-    
-
-
-   
 
     #region Moving methods
 
@@ -340,7 +335,7 @@ public class DefenderBehaviour : MonoBehaviour
         if (target == null) return false;
         RaycastHit hit;
         //attacker prefab has center of gravity shifted on the y-axis.
-        return ! Physics.Linecast(transform.position, target.transform.position + 1.5f * Vector3.up, out hit, ~attackerLayerMask);
+        return ! Physics.Linecast(transform.position, target.transform.position, out hit, ~attackerLayerMask);
     }
 
     private object IsTargetAlive(object bundle)
@@ -359,7 +354,6 @@ public class DefenderBehaviour : MonoBehaviour
         var proj = Instantiate(projectile, transform.position + transform.forward * 3f, transform.rotation);
         proj.GetComponent<Rigidbody>().AddForce((target.transform.position - transform.position).normalized * 5f);
 
-        Debug.DrawLine(transform.position, target.transform.position + 1.5f * Vector3.up, Color.red, 0.5f);
         return true;
     }
     private object ReleaseTarget(object bundle)

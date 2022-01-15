@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
-[RequireComponent(typeof(Animator))]
 [RequireComponent(typeof(HealthController))]
 public class AttackerBehaviour : MonoBehaviour
 {
@@ -22,7 +21,6 @@ public class AttackerBehaviour : MonoBehaviour
     private FSM fsm;
 
     private NavMeshAgent agent;
-    private Animator anim;
 
     private GameObject[] defenders;
     private GameObject nearestGate;
@@ -36,7 +34,6 @@ public class AttackerBehaviour : MonoBehaviour
         agent.speed = speed;
 
         GetComponent<HealthController>().SetOnHealthDroppedToZero(OnKilled);
-        anim = GetComponent<Animator>();
         defenders = GameObject.FindGameObjectsWithTag("Defender");
 
         FSMState breaching = new FSMState();
@@ -124,7 +121,6 @@ public class AttackerBehaviour : MonoBehaviour
 
     private object MoveToDestination(object bundle)
     {
-        anim.Play("Base Layer.Run");
         return agent.isActiveAndEnabled && agent.SetDestination(destination);
     }
 
@@ -160,7 +156,6 @@ public class AttackerBehaviour : MonoBehaviour
     {
         if (target == null || ! target.TryGetComponent<HealthController>(out var hc)) return false;
 
-        anim.Play("Base Layer.Attack");
         hc.TakeDamage(attackDamage, gameObject);
         if (hc.Health != 0) return true;
         target = null;
