@@ -5,12 +5,13 @@ using UnityEngine;
 public class Spawner : MonoBehaviour
 {
     public GameObject toSpawn;
-    [Range(1, 100)]
+    [Range(0, 100)]
     public int unitsAvailable = 10;
     [Range(0.1f, 10f)]
     public float spawnCooldown = 0.5f; 
     [Range(1, 10)]
     public float yOffset = 1;
+
     private bool canSpawn = true;
 
     void Update()

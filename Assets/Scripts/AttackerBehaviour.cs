@@ -11,12 +11,15 @@ public class AttackerBehaviour : MonoBehaviour
     [Range(0.1f, 5f)]
     public float reactionTime = 0.5f;
 
-    [Header("Generic settings")]
-    public float speed = 3.0f;
-
-    [Header("Attacking settings")]
+    [Header("Attacking parameters")]
+    [Range(1f, 10f)]
     public float attackDamage = 10f;
+    [Range(1f, 50f)]
     public float attackRange = 5.0f;
+
+    [Header("Movement parameters")]
+    [Range(1f, 10f)]
+    public float speed = 3.0f;
 
     private FSM fsm;
 
@@ -24,7 +27,7 @@ public class AttackerBehaviour : MonoBehaviour
 
     private GameObject[] defenders;
     private GameObject nearestGate;
-    public GameObject target;
+    private GameObject target;
     private Vector3 destination;
     private const float RandomEnemyPickingProbability = 0.5f;
 
@@ -40,7 +43,7 @@ public class AttackerBehaviour : MonoBehaviour
         breaching.enterActions.Add(FindNearestGate);
         DecisionTree breachingDT = CreateBreachingDecisionTree();
         breaching.stayActions.Add(() => breachingDT.walk());
-        breaching.exitActions = new List<FSMAction>{() => agent.SetDestination(transform.position + transform.forward *5f ), () => target = null};
+        breaching.exitActions = new List<FSMAction>{() => agent.SetDestination(transform.position + transform.forward *5f ), () => target = null, () => agent.stoppingDistance = 2f};
 
 
         FSMState attacking = new FSMState();
@@ -180,7 +183,6 @@ public class AttackerBehaviour : MonoBehaviour
 
     private void OnKilled()
     {
-
         Destroy(gameObject);
     }
 }

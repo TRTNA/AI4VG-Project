@@ -5,18 +5,17 @@ using UnityEngine;
 public class HealthController : Target, ISubject
 {
     public List<IObserver> observers = new List<IObserver>(); 
+    [Range(1, 1000)]
     public float health = 100f;
     public Material damagedMaterial;
 
     private Color baseMaterialColor;
     private Renderer renderer;
-    private float maxHealth;
     private OnHealthDroppedToZero onHealthDroppedToZero;
     private bool isPlaying;
 
     void Start()
     {
-        maxHealth = health;
         renderer = GetComponent<Renderer>();
         baseMaterialColor = renderer.material.color;
     }

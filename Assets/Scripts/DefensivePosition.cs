@@ -7,6 +7,7 @@ public class DefensivePosition : MonoBehaviour
 {
     [Range(1, 20)]
     public float reservationExpiration = 10f;
+
     private GameObject occupiedBy;
     private GameObject reservedBy;
 

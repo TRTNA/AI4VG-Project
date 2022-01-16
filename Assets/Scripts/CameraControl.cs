@@ -5,7 +5,7 @@ using System.Collections;
 [RequireComponent(typeof(Camera))]
 public class CameraControl : MonoBehaviour
 {
-    public GameObject target;//the target object
+    public GameObject target;
     [Range(10, 1000)]
     public float rotationSpeed = 20.0f;
 
@@ -21,7 +21,7 @@ public class CameraControl : MonoBehaviour
     private Camera myCamera;
 
     void Start()
-    {//Set up things on the start method
+    {
         if (maxOrthographicCameraSizeValue < minOrthographicCameraSizeValue)
         {
             maxOrthographicCameraSizeValue = 30;
@@ -41,5 +41,13 @@ public class CameraControl : MonoBehaviour
         transform.RotateAround(point, Vector3.up, -horizontalInput * rotationSpeed * Time.deltaTime);
         float newOrthographicSizeValue = Mathf.Clamp(myCamera.orthographicSize + cameraSizeDelta, minOrthographicCameraSizeValue, maxOrthographicCameraSizeValue);
         GetComponent<Camera>().orthographicSize = newOrthographicSizeValue;
+    }
+
+    public void OnValidate()
+    {
+        if (minOrthographicCameraSizeValue > maxOrthographicCameraSizeValue)
+        {
+            minOrthographicCameraSizeValue = maxOrthographicCameraSizeValue;
+        }
     }
 }
